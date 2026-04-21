@@ -2,23 +2,20 @@ import json
 import os
 import time
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 import urllib.request
-import urllib.error
 
 SUBREDDITS = ["marketing", "digital_marketing", "ecommerce", "smallbusiness"]
 TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
-ROME_TZ = timezone(timedelta(hours=2))  # CEST; works for scheduling purposes
+ROME_TZ = timezone(timedelta(hours=2))  # CEST
 
-# Keyword-based relevance scoring for Robert's business context
 KEYWORDS_HIGH = [
     "digital marketing", "email marketing", "seo", "sem", "google ads",
     "facebook ads", "meta ads", "instagram ads", "lead generation",
     "conversion rate", "ecommerce", "e-commerce", "shopify", "woocommerce",
     "small business", "copywriting", "landing page", "funnel", "analytics",
     "content marketing", "social media marketing", "roi", "cpa", "cpc",
-    "ctr", "roas", "pmi", "publishing", "affiliate marketing",
+    "ctr", "roas", "publishing", "affiliate marketing",
     "marketing automation", "crm", "retargeting", "a/b test",
 ]
 KEYWORDS_MID = [
@@ -32,7 +29,11 @@ KEYWORDS_MID = [
 
 def fetch_posts(subreddit: str, limit: int = 30) -> list:
     url = f"https://www.reddit.com/r/{subreddit}/top.json?t=week&limit={limit}"
-    req = urllib.request.Request(url, headers={"User-Agent": "RedditDailyReportBot/1.0"})
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; DailyReportBot/1.0; +https://github.com/robertfabi98/test)",
+        "Accept": "application/json",
+    }
+    req = urllib.request.Request(url, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             data = json.loads(resp.read())
@@ -48,11 +49,10 @@ def fetch_posts(subreddit: str, limit: int = 30) -> list:
         and not item["data"].get("stickied", False)
     ]
 
-    # fallback: top 3 della settimana se non ci sono post nelle 48h
     if not recent:
         recent = [
             item["data"]
-            for item in data["data"]["children"][:3]
+            for item in data["data"]["children"][:5]
             if not item["data"].get("stickied", False)
         ]
 
@@ -74,90 +74,22 @@ def relevance_score(post: dict) -> int:
 def summarize(post: dict) -> str:
     selftext = post.get("selftext", "").strip()
     if selftext and len(selftext) > 30:
-        return (selftext[:280].rsplit(" ", 1)[0] + "...") if len(selftext) > 280 else selftext
-    return post.get("title", "")
+        return (selftext[:250].rsplit(" ", 1)[0] + "...") if len(selftext) > 250 else selftext
+    return ""
 
 
-def build_report(all_posts: dict[str, list]) -> tuple[str, list]:
-    today_str = datetime.now(ROME_TZ).strftime("%d/%m/%Y")
-    lines = [
-        f"# Report Reddit Giornaliero — {today_str}",
-        "",
-        f"**Subreddit monitorati:** {', '.join('r/' + s for s in SUBREDDITS)}  ",
-        f"**Finestra temporale:** ultime 48 ore  ",
-        "",
-        "---",
-        "",
-    ]
-
-    all_scored: list[dict] = []
-
-    for subreddit, posts in all_posts.items():
-        lines.append(f"## r/{subreddit}")
-        lines.append("")
-
-        if not posts:
-            lines.append("*Nessun post trovato nelle ultime 48 ore.*")
-            lines.append("")
-            continue
-
-        for i, post in enumerate(posts, 1):
-            score = relevance_score(post)
-            summary = summarize(post)
-            url = f"https://reddit.com{post['permalink']}"
-            upvotes = post.get("score", 0)
-            comments = post.get("num_comments", 0)
-            stars = "⭐" * score
-
-            lines += [
-                f"### {i}. {post['title']}",
-                "",
-                f"**Riassunto:** {summary}",
-                "",
-                f"- 🔺 Upvote: **{upvotes:,}** | 💬 Commenti: **{comments:,}**",
-                f"- 📊 Rilevanza per il business: {stars} **({score}/10)**",
-                f"- 🔗 [Apri il post]({url})",
-                "",
-            ]
-
-            all_scored.append({
-                "title": post["title"],
-                "url": url,
-                "subreddit": subreddit,
-                "relevance": score,
-                "upvotes": upvotes,
-            })
-
-    top5 = sorted(all_scored, key=lambda x: (x["relevance"], x["upvotes"]), reverse=True)[:5]
-
-    lines += [
-        "---",
-        "",
-        "## 🏆 Top 5 Post per Rilevanza",
-        "",
-    ]
-    for i, p in enumerate(top5, 1):
-        lines.append(
-            f"{i}. **[{p['title']}]({p['url']})** "
-            f"(r/{p['subreddit']}) — {p['relevance']}/10"
-        )
-
-    lines += [
-        "",
-        "---",
-        f"*Report generato automaticamente il {today_str} alle 08:00 (ora italiana)*",
-    ]
-
-    return "\n".join(lines), top5
+def h(text: str) -> str:
+    """Escape HTML special characters for Telegram."""
+    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def send_telegram(token: str, chat_id: str, text: str) -> None:
+def send_telegram(token: str, chat_id: str, html: str) -> None:
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = json.dumps({
         "chat_id": chat_id,
-        "text": text,
-        "parse_mode": "Markdown",
-        "disable_web_page_preview": False,
+        "text": html,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True,
     }).encode()
     req = urllib.request.Request(
         url, data=payload,
@@ -167,43 +99,72 @@ def send_telegram(token: str, chat_id: str, text: str) -> None:
     with urllib.request.urlopen(req, timeout=15) as resp:
         result = json.loads(resp.read())
     if not result.get("ok"):
-        raise RuntimeError(f"Telegram API error: {result}")
+        raise RuntimeError(f"Telegram error: {result}")
 
 
 def main():
-    all_posts: dict[str, list] = {}
+    today_str = datetime.now(ROME_TZ).strftime("%d/%m/%Y")
+
+    send_telegram(
+        TELEGRAM_TOKEN, TELEGRAM_CHAT_ID,
+        f"\U0001f4ca <b>Report Reddit del {today_str}</b>\n"
+        f"Subreddit: r/marketing · r/digital_marketing · r/ecommerce · r/smallbusiness\n"
+        f"<i>Post con più engagement nelle ultime 48 ore</i>"
+    )
+    time.sleep(1)
+
+    all_scored: list[dict] = []
+
     for subreddit in SUBREDDITS:
         print(f"Recupero post da r/{subreddit}...")
-        all_posts[subreddit] = fetch_posts(subreddit)
-        time.sleep(2)  # rispetta i rate limit di Reddit
+        posts = fetch_posts(subreddit)
+        time.sleep(2)
 
-    report_md, top5 = build_report(all_posts)
+        if not posts:
+            send_telegram(
+                TELEGRAM_TOKEN, TELEGRAM_CHAT_ID,
+                f"\U0001f4cc <b>r/{subreddit}</b>\n<i>Nessun post trovato.</i>"
+            )
+            time.sleep(1)
+            continue
 
-    today = datetime.now(ROME_TZ).strftime("%Y-%m-%d")
-    report_path = Path("research/reports") / f"{today}.md"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(report_md, encoding="utf-8")
-    print(f"Report salvato: {report_path}")
+        lines = [f"\U0001f4cc <b>r/{subreddit}</b>\n"]
+        for i, post in enumerate(posts, 1):
+            score = relevance_score(post)
+            title = h(post.get("title", ""))
+            url = f"https://reddit.com{post['permalink']}"
+            upvotes = post.get("score", 0)
+            comments = post.get("num_comments", 0)
+            summary = h(summarize(post))
+            stars = "⭐" * score
 
-    today_str = datetime.now(ROME_TZ).strftime("%d/%m/%Y")
-    tg_lines = [
-        f"📊 *Report Reddit del {today_str}*",
-        "",
-        "*Top 5 post più rilevanti per il tuo business:*",
-        "",
-    ]
-    for i, p in enumerate(top5, 1):
-        tg_lines.append(
-            f"{i}\\. [{p['title']}]({p['url']}) "
-            f"\\(r/{p['subreddit']}\\) — ⭐ {p['relevance']}/10"
-        )
-    tg_lines += [
-        "",
-        f"📁 Report completo: `research/reports/{today}\\.md`",
-    ]
+            lines.append(f"<b>{i}. <a href='{url}'>{title}</a></b>")
+            if summary:
+                lines.append(f"<i>{summary}</i>")
+            lines.append(f"\U0001f53a {upvotes:,}  \U0001f4ac {comments:,}  {stars} {score}/10\n")
 
-    send_telegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, "\n".join(tg_lines))
-    print("Messaggio Telegram inviato.")
+            all_scored.append({
+                "title": post.get("title", ""),
+                "url": url,
+                "subreddit": subreddit,
+                "relevance": score,
+                "upvotes": upvotes,
+            })
+
+        send_telegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, "\n".join(lines))
+        time.sleep(1)
+
+    top5 = sorted(all_scored, key=lambda x: (x["relevance"], x["upvotes"]), reverse=True)[:5]
+    if top5:
+        summary_lines = ["\U0001f3c6 <b>Top 5 per rilevanza al tuo business:</b>\n"]
+        for i, p in enumerate(top5, 1):
+            summary_lines.append(
+                f"{i}. <a href='{p['url']}'>{h(p['title'])}</a>\n"
+                f"   r/{p['subreddit']} · ⭐ {p['relevance']}/10"
+            )
+        send_telegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, "\n".join(summary_lines))
+
+    print("Report inviato su Telegram.")
 
 
 if __name__ == "__main__":
