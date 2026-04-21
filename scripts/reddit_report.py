@@ -1,13 +1,30 @@
 import json
 import os
 import time
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
+from email.utils import parsedate_to_datetime
 import urllib.request
 
-SUBREDDITS = ["marketing", "digital_marketing", "ecommerce", "smallbusiness"]
 TELEGRAM_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
-ROME_TZ = timezone(timedelta(hours=2))  # CEST
+ROME_TZ = timezone(timedelta(hours=2))
+
+SOURCES = [
+    # Google News RSS — aggrega automaticamente tutti i media e blog italiani
+    {"name": "Digital Marketing",   "url": "https://news.google.com/rss/search?q=digital+marketing+italia&hl=it&gl=IT&ceid=IT:it",                  "type": "news"},
+    {"name": "Ecommerce Italia",    "url": "https://news.google.com/rss/search?q=ecommerce+italia&hl=it&gl=IT&ceid=IT:it",                           "type": "news"},
+    {"name": "PMI & Marketing",     "url": "https://news.google.com/rss/search?q=piccole+medie+imprese+marketing+digitale&hl=it&gl=IT&ceid=IT:it",   "type": "news"},
+    {"name": "Social Media Mkt",    "url": "https://news.google.com/rss/search?q=social+media+marketing+italia&hl=it&gl=IT&ceid=IT:it",              "type": "news"},
+    # Blog italiani diretti
+    {"name": "Ninja Marketing",     "url": "https://www.ninjamarketing.it/feed/",    "type": "news"},
+    {"name": "Wired Italia",        "url": "https://www.wired.it/feed/rss",          "type": "news"},
+    # YouTube — canali italiani top (digital marketing, business, ecommerce)
+    {"name": "Marco Montemagno",    "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCNg4RDHGls-HpbV10kWPlsw", "type": "youtube"},
+    {"name": "We Are Marketers",    "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCj4ft9BRkYngTO_qfWGzzdQ", "type": "youtube"},
+    {"name": "Mirko Cuneo",         "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCSnw8sw9mzJn4mFpnB36rlw", "type": "youtube"},
+    {"name": "Ninja Marketing YT",  "url": "https://www.youtube.com/feeds/videos.xml?channel_id=UCqY0bXYGZvRGSzE2WD74ang", "type": "youtube"},
+]
 
 KEYWORDS_HIGH = [
     "digital marketing", "email marketing", "seo", "sem", "google ads",
@@ -17,50 +34,91 @@ KEYWORDS_HIGH = [
     "content marketing", "social media marketing", "roi", "cpa", "cpc",
     "ctr", "roas", "publishing", "affiliate marketing",
     "marketing automation", "crm", "retargeting", "a/b test",
+    "intelligenza artificiale", "ai marketing", "automazione",
 ]
 KEYWORDS_MID = [
-    "marketing", "advertising", "campaign", "brand", "sales", "revenue",
-    "customer", "audience", "traffic", "organic", "paid", "b2b", "b2c",
-    "startup", "entrepreneur", "growth", "strategy", "automation",
-    "influencer", "newsletter", "product launch", "market research",
-    "customer acquisition", "retention", "upsell", "cross-sell",
+    "marketing", "advertising", "campagna", "brand", "vendite", "fatturato",
+    "cliente", "audience", "traffico", "organico", "paid", "b2b", "b2c",
+    "startup", "imprenditore", "crescita", "strategia", "automazione",
+    "influencer", "newsletter", "lancio prodotto", "ricerca di mercato",
+    "acquisizione clienti", "retention", "upsell", "cross-sell",
+    "digitale", "online", "web", "app", "piattaforma",
 ]
 
 
-def fetch_posts(subreddit: str, limit: int = 30) -> list:
-    url = f"https://www.reddit.com/r/{subreddit}/top.json?t=week&limit={limit}"
+def parse_date(date_str: str) -> datetime | None:
+    if not date_str:
+        return None
+    try:
+        return parsedate_to_datetime(date_str.strip())
+    except Exception:
+        pass
+    try:
+        return datetime.fromisoformat(date_str.strip())
+    except Exception:
+        pass
+    return None
+
+
+def fetch_feed(source: dict) -> list:
     headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; DailyReportBot/1.0; +https://github.com/robertfabi98/test)",
-        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/rss+xml, application/xml, text/xml, */*",
     }
-    req = urllib.request.Request(url, headers=headers)
+    req = urllib.request.Request(source["url"], headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
+            content = resp.read()
     except Exception as e:
-        print(f"[WARN] r/{subreddit}: {e}")
+        print(f"[WARN] {source['name']}: {e}")
         return []
 
-    cutoff = time.time() - 48 * 3600
-    recent = [
-        item["data"]
-        for item in data["data"]["children"]
-        if item["data"]["created_utc"] >= cutoff
-        and not item["data"].get("stickied", False)
-    ]
+    try:
+        root = ET.fromstring(content)
+    except ET.ParseError as e:
+        print(f"[WARN] XML parse error {source['name']}: {e}")
+        return []
 
-    if not recent:
-        recent = [
-            item["data"]
-            for item in data["data"]["children"][:5]
-            if not item["data"].get("stickied", False)
-        ]
+    ATOM = "{http://www.w3.org/2005/Atom}"
+    items = []
 
-    return sorted(recent, key=lambda p: p["score"], reverse=True)[:5]
+    # RSS 2.0
+    for item in root.findall(".//item"):
+        title = (item.findtext("title") or "").strip()
+        link = (item.findtext("link") or "").strip()
+        desc = (item.findtext("description") or "").strip()
+        date = parse_date(item.findtext("pubDate") or "")
+        if title and link:
+            items.append({"title": title, "url": link, "summary": desc[:250], "date": date, "source": source["name"], "type": source["type"]})
+
+    # Atom (YouTube e altri)
+    for entry in root.findall(f".//{ATOM}entry"):
+        title = (entry.findtext(f"{ATOM}title") or "").strip()
+        link_el = entry.find(f"{ATOM}link[@rel='alternate']") or entry.find(f"{ATOM}link")
+        link = link_el.get("href", "") if link_el is not None else ""
+        published = entry.findtext(f"{ATOM}published") or entry.findtext(f"{ATOM}updated") or ""
+        summary = (entry.findtext(f"{ATOM}summary") or entry.findtext(f"{ATOM}content") or "").strip()
+        date = parse_date(published)
+        if title and link:
+            items.append({"title": title, "url": link, "summary": summary[:250], "date": date, "source": source["name"], "type": source["type"]})
+
+    return items
 
 
-def relevance_score(post: dict) -> int:
-    text = (post.get("title", "") + " " + post.get("selftext", "")).lower()
+def is_recent(item: dict, hours: int) -> bool:
+    date = item.get("date")
+    if not date:
+        return True
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    try:
+        d = date if date.tzinfo else date.replace(tzinfo=timezone.utc)
+        return d >= cutoff
+    except Exception:
+        return True
+
+
+def relevance_score(item: dict) -> int:
+    text = (item.get("title", "") + " " + item.get("summary", "")).lower()
     score = 1
     for kw in KEYWORDS_HIGH:
         if kw in text:
@@ -71,31 +129,14 @@ def relevance_score(post: dict) -> int:
     return min(score, 10)
 
 
-def summarize(post: dict) -> str:
-    selftext = post.get("selftext", "").strip()
-    if selftext and len(selftext) > 30:
-        return (selftext[:250].rsplit(" ", 1)[0] + "...") if len(selftext) > 250 else selftext
-    return ""
-
-
 def h(text: str) -> str:
-    """Escape HTML special characters for Telegram."""
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def send_telegram(token: str, chat_id: str, html: str) -> None:
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = json.dumps({
-        "chat_id": chat_id,
-        "text": html,
-        "parse_mode": "HTML",
-        "disable_web_page_preview": True,
-    }).encode()
-    req = urllib.request.Request(
-        url, data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
+    payload = json.dumps({"chat_id": chat_id, "text": html, "parse_mode": "HTML", "disable_web_page_preview": True}).encode()
+    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"}, method="POST")
     with urllib.request.urlopen(req, timeout=15) as resp:
         result = json.loads(resp.read())
     if not result.get("ok"):
@@ -105,64 +146,70 @@ def send_telegram(token: str, chat_id: str, html: str) -> None:
 def main():
     today_str = datetime.now(ROME_TZ).strftime("%d/%m/%Y")
 
-    send_telegram(
-        TELEGRAM_TOKEN, TELEGRAM_CHAT_ID,
-        f"\U0001f4ca <b>Report Reddit del {today_str}</b>\n"
-        f"Subreddit: r/marketing · r/digital_marketing · r/ecommerce · r/smallbusiness\n"
-        f"<i>Post con più engagement nelle ultime 48 ore</i>"
+    send_telegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID,
+        f"\U0001f4ca <b>Report Digitale del {today_str}</b>\n"
+        f"Blog, news e YouTube italiani\n"
+        f"<i>Digital marketing · Ecommerce · PMI · Social media</i>"
     )
     time.sleep(1)
 
-    all_scored: list[dict] = []
+    all_news: list[dict] = []
+    all_youtube: list[dict] = []
 
-    for subreddit in SUBREDDITS:
-        print(f"Recupero post da r/{subreddit}...")
-        posts = fetch_posts(subreddit)
-        time.sleep(2)
-
-        if not posts:
-            send_telegram(
-                TELEGRAM_TOKEN, TELEGRAM_CHAT_ID,
-                f"\U0001f4cc <b>r/{subreddit}</b>\n<i>Nessun post trovato.</i>"
-            )
-            time.sleep(1)
-            continue
-
-        lines = [f"\U0001f4cc <b>r/{subreddit}</b>\n"]
-        for i, post in enumerate(posts, 1):
-            score = relevance_score(post)
-            title = h(post.get("title", ""))
-            url = f"https://reddit.com{post['permalink']}"
-            upvotes = post.get("score", 0)
-            comments = post.get("num_comments", 0)
-            summary = h(summarize(post))
-            stars = "⭐" * score
-
-            lines.append(f"<b>{i}. <a href='{url}'>{title}</a></b>")
-            if summary:
-                lines.append(f"<i>{summary}</i>")
-            lines.append(f"\U0001f53a {upvotes:,}  \U0001f4ac {comments:,}  {stars} {score}/10\n")
-
-            all_scored.append({
-                "title": post.get("title", ""),
-                "url": url,
-                "subreddit": subreddit,
-                "relevance": score,
-                "upvotes": upvotes,
-            })
-
-        send_telegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, "\n".join(lines))
+    for source in SOURCES:
+        print(f"Fetching {source['name']}...")
+        items = fetch_feed(source)
+        hours = 48 if source["type"] == "news" else 168
+        recent = [i for i in items if is_recent(i, hours)]
+        if not recent and items:
+            recent = items[:3]
+        for item in recent:
+            item["relevance"] = relevance_score(item)
+        if source["type"] == "news":
+            all_news.extend(recent)
+        else:
+            all_youtube.extend(recent)
         time.sleep(1)
 
-    top5 = sorted(all_scored, key=lambda x: (x["relevance"], x["upvotes"]), reverse=True)[:5]
+    seen: set[str] = set()
+    unique_news, unique_yt = [], []
+    for item in sorted(all_news, key=lambda x: x["relevance"], reverse=True):
+        if item["url"] not in seen:
+            seen.add(item["url"])
+            unique_news.append(item)
+    for item in sorted(all_youtube, key=lambda x: x["relevance"], reverse=True):
+        if item["url"] not in seen:
+            seen.add(item["url"])
+            unique_yt.append(item)
+
+    if unique_news:
+        lines = ["\U0001f5de️ <b>Blog &amp; News Italiani</b>\n"]
+        for i, item in enumerate(unique_news[:7], 1):
+            lines.append(f"{i}. <a href='{item['url']}'>{h(item['title'])}</a>")
+            lines.append(f"   \U0001f4cc {h(item['source'])}  ·  ⭐ {item['relevance']}/10\n")
+        send_telegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, "\n".join(lines))
+    else:
+        send_telegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, "\U0001f5de️ <b>Blog &amp; News</b>\n<i>Nessun articolo trovato.</i>")
+    time.sleep(1)
+
+    if unique_yt:
+        lines = ["\U0001f4fa <b>YouTube Italiani</b>\n"]
+        for i, item in enumerate(unique_yt[:5], 1):
+            lines.append(f"{i}. <a href='{item['url']}'>{h(item['title'])}</a>")
+            lines.append(f"   \U0001f4cc {h(item['source'])}  ·  ⭐ {item['relevance']}/10\n")
+        send_telegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, "\n".join(lines))
+    else:
+        send_telegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, "\U0001f4fa <b>YouTube</b>\n<i>Nessun video trovato.</i>")
+    time.sleep(1)
+
+    top5 = sorted(unique_news[:10] + unique_yt[:5], key=lambda x: x["relevance"], reverse=True)[:5]
     if top5:
-        summary_lines = ["\U0001f3c6 <b>Top 5 per rilevanza al tuo business:</b>\n"]
-        for i, p in enumerate(top5, 1):
-            summary_lines.append(
-                f"{i}. <a href='{p['url']}'>{h(p['title'])}</a>\n"
-                f"   r/{p['subreddit']} · ⭐ {p['relevance']}/10"
-            )
-        send_telegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, "\n".join(summary_lines))
+        lines = ["\U0001f3c6 <b>Top 5 per rilevanza al tuo business</b>\n"]
+        for i, item in enumerate(top5, 1):
+            emoji = "\U0001f4fa" if item["type"] == "youtube" else "\U0001f5de️"
+            lines.append(f"{i}. {emoji} <a href='{item['url']}'>{h(item['title'])}</a>")
+            lines.append(f"   {h(item['source'])}  ·  ⭐ {item['relevance']}/10\n")
+        send_telegram(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, "\n".join(lines))
 
     print("Report inviato su Telegram.")
 
