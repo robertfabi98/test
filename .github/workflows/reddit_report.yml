@@ -1,0 +1,40 @@
+name: Reddit Daily Report
+
+on:
+  schedule:
+    # 06:00 UTC = 08:00 CEST (estate, UTC+2)
+    # In inverno (CET, UTC+1) arriva alle 07:00 — cambia a "0 7 * * *" da ottobre
+    - cron: '0 6 * * *'
+  workflow_dispatch: # trigger manuale dal sito GitHub per test
+
+permissions:
+  contents: write  # necessario per fare il commit del report
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Genera il report Reddit
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python scripts/reddit_report.py
+
+      - name: Commit e push del report
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "GitHub Actions"
+          git add research/reports/
+          git diff --staged --quiet || git commit -m "report: Reddit daily report $(date -u +%Y-%m-%d)"
+          git push
