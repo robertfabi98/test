@@ -3,9 +3,9 @@ name: Reddit Daily Report
 on:
   schedule:
     # 06:00 UTC = 08:00 CEST (estate, UTC+2)
-    # In inverno (CET, UTC+1) arriva alle 07:00 — cambia a "0 7 * * *" da ottobre
+    # Da ottobre (CET, UTC+1): cambia in '0 7 * * *' per restare alle 08:00
     - cron: '0 6 * * *'
-  workflow_dispatch: # trigger manuale dal sito GitHub per test
+  workflow_dispatch: # trigger manuale per test
 
 permissions:
   contents: read
@@ -13,6 +13,7 @@ permissions:
 jobs:
   generate-report:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -23,7 +24,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Genera il report Reddit e invia su Telegram
+      - name: Genera il report e invia su Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
