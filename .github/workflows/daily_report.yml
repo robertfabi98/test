@@ -30,7 +30,7 @@ jobs:
       - name: Invia report ClickUp su Telegram
         env:
           CLICKUP_TOKEN: ${{ secrets.CLICKUP_TOKEN }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CLICKUP_SPACE_ID: ${{ secrets.CLICKUP_SPACE_ID }}
         run: python scripts/clickup_report.py
