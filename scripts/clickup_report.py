@@ -61,12 +61,12 @@ def fmt_due(due_ms) -> str | None:
     return dt.strftime("%d/%m")
 
 
-def due_within_7(due_ms) -> bool:
+def due_within_3(due_ms) -> bool:
     if not due_ms:
         return False
     now = datetime.now(timezone.utc)
     due = datetime.fromtimestamp(int(due_ms) / 1000, tz=timezone.utc)
-    return timedelta(0) <= (due - now) <= timedelta(days=7)
+    return timedelta(0) <= (due - now) <= timedelta(days=3)
 
 
 def send_telegram(text: str) -> None:
@@ -91,42 +91,33 @@ def classify(status: str) -> str:
 
 
 def build_client_message(folder_name: str, tasks: list) -> str:
-    progress, review, todo, due_soon = [], [], [], []
+    review, due_soon = [], []
 
     for task in tasks:
         name = task.get("name", "").strip()
         status = task.get("status", {}).get("status", "")
         due_ms = task.get("due_date")
         due_str = fmt_due(due_ms)
-        cat = classify(status)
 
-        if cat == "progress":
-            line = f"  • {name}"
-            if due_str:
-                line += f"  ⏰ {due_str}"
-            progress.append(line)
-        elif cat == "review":
+        if classify(status) == "review":
             line = f"  • {name}"
             if due_str:
                 line += f" — {due_str}"
             review.append(line)
-        else:
-            todo.append(f"  • {name}")
 
-        if due_within_7(due_ms):
+        if due_within_3(due_ms):
             suffix = f" — {due_str}" if due_str else ""
             due_soon.append(f"  • {name}{suffix}")
 
+    if not review and not due_soon:
+        return ""
+
     lines = [f"📁 *{folder_name}*", f"_{len(tasks)} task totali_"]
 
-    if progress:
-        lines += ["", "🟢 *In lavorazione*"] + progress
     if review:
-        lines += ["", "🔵 *In revisione*"] + review
+        lines += ["", "🔵 *In revisione* _(richiede la tua attenzione)_"] + review
     if due_soon:
-        lines += ["", "🔴 *In scadenza (7 giorni)*"] + due_soon
-    if todo:
-        lines += ["", "⚪ *Da fare*"] + todo
+        lines += ["", "🔴 *In scadenza (3 giorni)*"] + due_soon
 
     return "\n".join(lines)
 
@@ -139,7 +130,7 @@ def main():
 
     folders = get_folders(CLICKUP_SPACE_ID)
 
-    totals = {"tasks": 0, "progress": 0, "review": 0, "due_soon": 0}
+    totals = {"tasks": 0, "review": 0, "due_soon": 0}
 
     for folder in folders:
         tasks = get_tasks(folder["id"])
@@ -147,25 +138,22 @@ def main():
             continue
 
         msg = build_client_message(folder["name"], tasks)
-        send_telegram(msg)
+        if msg:
+            send_telegram(msg)
 
         totals["tasks"] += len(tasks)
         for task in tasks:
             status = task.get("status", {}).get("status", "")
-            cat = classify(status)
-            if cat == "progress":
-                totals["progress"] += 1
-            elif cat == "review":
+            if classify(status) == "review":
                 totals["review"] += 1
-            if due_within_7(task.get("due_date")):
+            if due_within_3(task.get("due_date")):
                 totals["due_soon"] += 1
 
     send_telegram(
         f"📈 *Riepilogo workspace*\n"
-        f"Task totali: *{totals['tasks']}*\n"
-        f"🟢 In lavorazione: *{totals['progress']}*\n"
+        f"Task totali aperti: *{totals['tasks']}*\n"
         f"🔵 In revisione: *{totals['review']}*\n"
-        f"🔴 In scadenza: *{totals['due_soon']}*"
+        f"🔴 In scadenza (3 gg): *{totals['due_soon']}*"
     )
 
 
