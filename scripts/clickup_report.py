@@ -22,11 +22,17 @@ def get_folders(space_id: str) -> list:
     return resp.json().get("folders", [])
 
 
-def get_tasks(folder_id: str) -> list:
+def get_lists(folder_id: str) -> list:
+    resp = requests.get(f"{BASE_URL}/folder/{folder_id}/list", headers=HEADERS)
+    resp.raise_for_status()
+    return resp.json().get("lists", [])
+
+
+def get_tasks_from_list(list_id: str) -> list:
     tasks, page = [], 0
     while True:
         resp = requests.get(
-            f"{BASE_URL}/folder/{folder_id}/task",
+            f"{BASE_URL}/list/{list_id}/task",
             headers=HEADERS,
             params={"include_closed": "false", "subtasks": "true", "page": page},
         )
@@ -38,6 +44,14 @@ def get_tasks(folder_id: str) -> list:
         page += 1
         time.sleep(0.3)
     return tasks
+
+
+def get_tasks(folder_id: str) -> list:
+    all_tasks = []
+    for lst in get_lists(folder_id):
+        all_tasks.extend(get_tasks_from_list(lst["id"]))
+        time.sleep(0.2)
+    return all_tasks
 
 
 def fmt_due(due_ms) -> str | None:
