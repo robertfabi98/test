@@ -1,0 +1,46 @@
+name: Accounting Bot
+
+on:
+  schedule:
+    # Ogni ora - controlla nuovi messaggi contabili da Telegram
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests openpyxl gspread google-auth
+
+      - name: Elabora messaggi contabili
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+          GOOGLE_CREDENTIALS_JSON: ${{ secrets.GOOGLE_CREDENTIALS_JSON }}
+          OUTPUT_DIR: ${{ github.workspace }}/contabilita
+        run: |
+          cd scripts/accounting
+          python poll_and_fill.py
+
+      - name: Salva file aggiornati nel repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add contabilita/ scripts/accounting/.telegram_offset 2>/dev/null || true
+          git diff --staged --quiet || git commit -m "chore: aggiorna contabilità [skip ci]"
+          git push origin HEAD

@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - contabilita:/app/contabilita
+    env_file:
+      - .env
+
+volumes:
+  contabilita:
