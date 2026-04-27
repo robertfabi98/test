@@ -1,0 +1,5 @@
+python-telegram-bot==21.3
+openpyxl==3.1.5
+# Google Sheets sync (opzionale)
+gspread==6.1.2
+google-auth==2.29.0
