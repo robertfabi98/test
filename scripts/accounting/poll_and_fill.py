@@ -25,16 +25,16 @@ except ImportError:
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-TOKEN    = os.environ['TELEGRAM_BOT_TOKEN']
-CHAT_ID  = str(os.environ.get('TELEGRAM_CHAT_ID', ''))
-SHEET_ID = os.environ.get('GOOGLE_SHEET_ID', '')
+TOKEN     = os.environ['TELEGRAM_BOT_TOKEN']
+CHAT_ID   = str(os.environ.get('TELEGRAM_CHAT_ID', ''))
+SHEET_ID  = os.environ.get('GOOGLE_SHEET_ID', '')
 OUTPUT_DIR = os.environ.get(
     'OUTPUT_DIR',
     os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'contabilita')
 )
 
-_API          = f'https://api.telegram.org/bot{TOKEN}'
-_OFFSET_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.telegram_offset')
+_API         = f'https://api.telegram.org/bot{TOKEN}'
+_OFFSET_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.telegram_offset')
 
 
 def _load_offset() -> int:
@@ -77,6 +77,7 @@ def main() -> None:
     logger.info(f'{len(updates)} aggiornamenti ricevuti (offset={offset})')
 
     if not updates:
+        _save_offset(offset)  # assicura che il file esista sempre
         return
 
     new_offset = max(u['update_id'] for u in updates) + 1
