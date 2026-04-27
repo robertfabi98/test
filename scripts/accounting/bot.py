@@ -61,8 +61,6 @@ async def handle_text(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
-    await update.message.reply_text('Elaborazione in corso…')
-
     try:
         path = generate_excel(record, OUTPUT_DIR)
 
@@ -76,7 +74,7 @@ async def handle_text(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
                 sheets_note = '\n• Sheets sync fallito'
 
         lines = [
-            f'Data: {record.date.strftime("%d/%m/%Y")}',
+            f'✅ Contabilità aggiornata — {record.date.strftime("%d/%m/%Y")}',
             '',
             f'Entrate:   {record.totale_entrate:>10.2f} €',
             f'Spese:     {record.totale_spese:>10.2f} €',
@@ -84,16 +82,9 @@ async def handle_text(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
             f'Borselli:  {record.totale_borselli:>10.2f} €',
             '─' * 30,
             f'Saldo:     {record.saldo:>10.2f} €',
-            '',
-            f'File: {os.path.basename(path)}{sheets_note}',
+            f'{sheets_note}',
         ]
         await update.message.reply_text('\n'.join(lines))
-
-        with open(path, 'rb') as fh:
-            await update.message.reply_document(
-                document=fh,
-                filename=os.path.basename(path),
-            )
 
     except Exception as e:
         logger.exception('Errore elaborazione messaggio')
