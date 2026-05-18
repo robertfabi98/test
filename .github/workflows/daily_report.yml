@@ -1,10 +1,6 @@
 name: ClickUp Daily Report
 
 on:
-  schedule:
-    # 07:00 UTC = 08:00 CET (inverno, UTC+1)
-    # In estate (CEST, UTC+2) cambia in "0 6 * * *" per restare alle 08:00
-    - cron: '0 7 * * *'
   workflow_dispatch:
 
 permissions:
