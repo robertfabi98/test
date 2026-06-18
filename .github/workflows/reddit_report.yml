@@ -1,11 +1,7 @@
 name: Reddit Daily Report
 
 on:
-  schedule:
-    # 06:00 UTC = 08:00 CEST (estate, UTC+2)
-    # Da ottobre (CET, UTC+1): cambia in '0 7 * * *' per restare alle 08:00
-    - cron: '0 6 * * *'
-  workflow_dispatch: # trigger manuale per test
+  workflow_dispatch: # PAUSA - schedule rimosso
 
 permissions:
   contents: read
