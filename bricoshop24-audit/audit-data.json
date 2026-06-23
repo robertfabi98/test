@@ -1,0 +1,294 @@
+{
+  "domain": "bricoshop24.it",
+  "url": "https://www.bricoshop24.it/",
+  "audit_date": "2026-06-23",
+  "platform": "OpenCart (inferred)",
+  "business_type": "E-commerce multi-categoria — Porte Blindate, Arredamento, Giardino, Cucina, Riscaldamento, Bricolage",
+  "location": "Via del Prato della Corte 1422, 00123 Roma",
+  "summary": {
+    "health_score": 38,
+    "business_type": "E-commerce multi-categoria (IT)",
+    "top_findings": [
+      "WAF/CDN blocca Googlebot e AI crawlers (HTTP 403 su IP datacenter) — rischio deindexazione",
+      "URL legacy OpenCart (?product_id=X&route=product/product) in circolazione — duplicate content",
+      "Schema markup completamente assente — 0 Product, 0 Organization, 0 BreadcrumbList",
+      "Pagine categoria senza contenuto editoriale — mismatch con SERP ibridi per 'porte blindate online'",
+      "P.IVA / REA assenti dal footer (violazione D.Lgs. 70/2003)"
+    ],
+    "quick_wins": [
+      "Sbloccare Googlebot nel WAF (1-2h, impatto immediato)",
+      "Aggiungere P.IVA + REA al footer (30min, legale + trust)",
+      "Organization + AggregateRating schema in homepage (2h, stelle SERP)",
+      "Portare Trustpilot 4★ e eBay 97.4% in homepage (1h, conversione)",
+      "Redirect 301 URL legacy OpenCart (4-8h, duplicate content fix)"
+    ]
+  },
+  "categories": [
+    {
+      "name": "Technical SEO",
+      "score": 44,
+      "what_works": [
+        "HTTPS attivo",
+        "URL slug SEO-friendly su prodotti recenti",
+        "Struttura URL gerarchica e descrittiva",
+        "Piattaforma PHP/SSR — basso rischio JS rendering"
+      ],
+      "findings": [
+        {
+          "title": "WAF blocca Googlebot (HTTP 403 su IP datacenter)",
+          "severity": "Critical",
+          "description": "Il server restituisce x-deny-reason: host_not_allowed a tutti gli IP datacenter, inclusi quelli di Googlebot. Causa deindexazione progressiva.",
+          "recommendation": "Whitelist IP Googlebot (googlebot.json) e Bingbot nel WAF. Validare con GSC Ispezione URL > Test Live URL."
+        },
+        {
+          "title": "URL legacy OpenCart duplicati in circolazione",
+          "severity": "Critical",
+          "description": "URL ?product_id=X&route=product/product trovati in circolazione insieme agli slug SEO-friendly. Duplicate content su ogni prodotto.",
+          "recommendation": "301 redirect da tutti i pattern legacy agli slug puliti. Canonical tag su ogni prodotto verso lo slug."
+        },
+        {
+          "title": "robots.txt restituisce 403",
+          "severity": "High",
+          "description": "Google interpreta 403 su robots.txt come potenziale disallow totale per 24h per crawl.",
+          "recommendation": "Rendere robots.txt accessibile (HTTP 200) da qualsiasi IP."
+        },
+        {
+          "title": "www vs non-www non risolto",
+          "severity": "High",
+          "description": "Il dominio non-www sembra ospitare ancora versioni legacy. Rischio link equity frammentata.",
+          "recommendation": "301 da http://bricoshop24.it e https://bricoshop24.it → https://www.bricoshop24.it per tutti i path."
+        },
+        {
+          "title": "Title tag homepage troncato in SERP",
+          "severity": "High",
+          "description": "SERP mostra '...arredo casa, giardino e...' con ellissi — oltre 60 caratteri.",
+          "recommendation": "Riscrivere a ≤60 char: 'Bricoshop24 | Porte Blindate, Arredo Casa e Giardino'"
+        }
+      ]
+    },
+    {
+      "name": "Content Quality & E-E-A-T",
+      "score": 48,
+      "what_works": [
+        "Indirizzo fisico Roma specifico e verificabile",
+        "Due numeri di telefono + orari supporto pubblicati",
+        "USP concreti: garanzia italiana, consegna 24h",
+        "Sottocategorie porte blindate ben strutturate"
+      ],
+      "findings": [
+        {
+          "title": "P.IVA / REA assenti dal footer",
+          "severity": "Critical",
+          "description": "Obbligatorio per D.Lgs. 70/2003. Assenza = rischio legale + penalità E-E-A-T.",
+          "recommendation": "Aggiungere P.IVA, REA, ragione sociale in footer entro 24h."
+        },
+        {
+          "title": "Nessun autore nominato sui blog post",
+          "severity": "High",
+          "description": "Contenuto YMYL-adjacent (sicurezza casa) senza byline. Google QRG settembre 2025 pesa fortemente l'authorship.",
+          "recommendation": "Creare profilo autore con credenziali, assegnare a tutti i post esistenti e futuri."
+        },
+        {
+          "title": "Pagine categoria senza blocco editoriale",
+          "severity": "High",
+          "description": "PLP pure senza testo descrittivo. Il SERP per 'porte blindate online' premia pagine ibride con guida acquisto.",
+          "recommendation": "Aggiungere 500+ parole editoriali su /porte-blindate, 300+ su categorie secondarie."
+        },
+        {
+          "title": "Asset eBay (97.4%, 19k+ vendite) non comunicato",
+          "severity": "Medium",
+          "description": "Trust signal unico e verificabile non presente sul sito.",
+          "recommendation": "Aggiungere widget/badge eBay in homepage e chi-siamo con link al profilo seller."
+        }
+      ]
+    },
+    {
+      "name": "Schema / Structured Data",
+      "score": 5,
+      "what_works": [],
+      "findings": [
+        {
+          "title": "Product + Offer schema assente su pagine prodotto",
+          "severity": "Critical",
+          "description": "OpenCart non emette JSON-LD valido by default. Sito non idoneo a rich results prezzo/disponibilità.",
+          "recommendation": "Implementare Product JSON-LD in template prodotto: name, offers.price, priceCurrency, availability, image."
+        },
+        {
+          "title": "Organization schema assente",
+          "severity": "Critical",
+          "description": "Nessuna identity markup. Google non associa telefono, indirizzo, Trustpilot al brand entity.",
+          "recommendation": "Organization JSON-LD in homepage con name, url, logo, contactPoint, address, sameAs."
+        },
+        {
+          "title": "BreadcrumbList assente",
+          "severity": "High",
+          "description": "Gerarchia 3 livelli esiste ma non è encodata. Google non mostra breadcrumb in SERP.",
+          "recommendation": "BreadcrumbList dinamico da variabile Smarty in category.tpl e product.tpl."
+        },
+        {
+          "title": "Article schema assente su blog",
+          "severity": "High",
+          "description": "Post blog senza datePublished, headline, author — esclusi da Google Discover.",
+          "recommendation": "Article JSON-LD nel template blog: headline, datePublished, author, publisher, image."
+        }
+      ]
+    },
+    {
+      "name": "Performance (CWV)",
+      "score": 45,
+      "what_works": [
+        "Piattaforma SSR — no JS rendering overhead"
+      ],
+      "findings": [
+        {
+          "title": "LCP probabile > 2.5s su mobile",
+          "severity": "High",
+          "description": "Immagini prodotto above-fold senza fetchpriority o preload. Pattern tipico OpenCart.",
+          "recommendation": "fetchpriority='high' + <link rel='preload'> su immagine LCP. WebP/AVIF via CDN."
+        },
+        {
+          "title": "INP a rischio da script terze parti",
+          "severity": "Medium",
+          "description": "Script analytics, remarketing e chat tipicamente caricati in modo sincrono su OpenCart.",
+          "recommendation": "Defer tutti gli script non-critici. Rimuovere script inutilizzati."
+        },
+        {
+          "title": "CLS da cookie banner e banner promo",
+          "severity": "Medium",
+          "description": "Overlay caricati dopo paint causano layout shift. CLS target < 0.1.",
+          "recommendation": "Dimensioni esplicite width/height su tutte le immagini. Posizionamento fisso per overlay."
+        }
+      ]
+    },
+    {
+      "name": "SXO — Search Experience",
+      "score": 51,
+      "what_works": [
+        "Homepage brand allineata con intent navigazionale",
+        "URL struttura gerarchica e descrittiva",
+        "Trustpilot 4 stelle segnale trust"
+      ],
+      "findings": [
+        {
+          "title": "Mismatch pagina /porte-blindate vs. SERP ibridi",
+          "severity": "High",
+          "description": "60% top-10 SERP 'porte blindate online' = PLP + guida acquisto + FAQ. Bricoshop24 ha PLP pura.",
+          "recommendation": "Aggiungere blocco editoriale 500 parole + FAQPage schema su /porte-blindate. Rispondere alle 4 PAA dominanti."
+        },
+        {
+          "title": "Nessuna opzione BNPL (rateizzazione)",
+          "severity": "Medium",
+          "description": "Porte blindate €600–3.000. Competitor usano Scalapay/Klarna come leva di conversione primaria.",
+          "recommendation": "Integrare Scalapay o Klarna. Mostrare prominentemente su /porte-blindate e pagine prodotto."
+        }
+      ]
+    },
+    {
+      "name": "AI Search Readiness (GEO)",
+      "score": 18,
+      "what_works": [
+        "Entità brand presente su Trustpilot, ManoMano, Leroy Merlin — citabilità indiretta"
+      ],
+      "findings": [
+        {
+          "title": "AI crawler bloccati dal WAF (GPTBot, Google-Extended, PerplexityBot)",
+          "severity": "Critical",
+          "description": "Tutti i principali AI crawler operano da IP datacenter — bloccati dallo stesso WAF che blocca Googlebot.",
+          "recommendation": "Aggiungere user-agent allowlist per GPTBot, Google-Extended, Anthropic-AI, PerplexityBot nel WAF."
+        },
+        {
+          "title": "Nessun llms.txt",
+          "severity": "Critical",
+          "description": "Standard emergente per comunicare ai LLM quale contenuto è disponibile per citazione.",
+          "recommendation": "Creare /llms.txt con identità brand, categorie, contatti, formato citazione preferito."
+        },
+        {
+          "title": "Nessun contenuto con passaggi citabili strutturati",
+          "severity": "High",
+          "description": "AI Overviews citano passaggi specifici — FAQ block, definizioni, liste numerate. Nessuno presente.",
+          "recommendation": "Creare articolo 'Porta Blindata Classe 3 vs 4: guida 2026' con FAQPage schema e definizioni strutturate."
+        }
+      ]
+    },
+    {
+      "name": "Backlinks",
+      "score": null,
+      "score_status": "INSUFFICIENT_DATA",
+      "what_works": [
+        "Co-citation forte da Leroy Merlin e ManoMano",
+        "Presenza su directory Crunchbase, Pagine Gialle"
+      ],
+      "findings": [
+        {
+          "title": "Profilo backlink esiguo per dimensione commerciale",
+          "severity": "High",
+          "description": "~8 referring domain noti per brand con 10+ anni, 3.370 prodotti Leroy Merlin, 19k vendite eBay.",
+          "recommendation": "Target 20+ nuovi referring domain in 6 mesi da: pagine fornitore, editoriale italiano, CCIAA Roma."
+        },
+        {
+          "title": "2 domini sospetti (siteindices.com, revool.net)",
+          "severity": "High",
+          "description": "Scraper automatici — 25% dei known referring domain sono low-trust.",
+          "recommendation": "Verificare esistenza link, poi disavow via Google Search Console."
+        }
+      ]
+    }
+  ],
+  "action_plan": {
+    "phases": [
+      {
+        "name": "Fase 1: Fix Critici",
+        "timeframe": "Settimana 1",
+        "items": [
+          "Sbloccare Googlebot e AI crawler nel WAF",
+          "301 redirect URL legacy OpenCart",
+          "robots.txt e sitemap accessibili (HTTP 200)",
+          "P.IVA / REA in footer",
+          "Risolvere www vs non-www"
+        ]
+      },
+      {
+        "name": "Fase 2: Quick Wins",
+        "timeframe": "Settimane 2–3",
+        "items": [
+          "Organization + AggregateRating schema in homepage",
+          "BreadcrumbList su tutte le categorie e prodotti",
+          "Product + Offer schema su template prodotto",
+          "Title tag homepage corretto (≤60 char)",
+          "Trust signals eBay + Trustpilot in homepage",
+          "fetchpriority + preload per LCP",
+          "Canonical tag contro parametri UTM/marketplace"
+        ]
+      },
+      {
+        "name": "Fase 3: Contenuto & Autorità",
+        "timeframe": "Mese 2",
+        "items": [
+          "Blocco editoriale 500 parole su /porte-blindate + FAQPage schema",
+          "Articolo pillar 'Porta Blindata Classe 3 vs 4: guida 2026' (2000+ parole)",
+          "Profilo autore per il blog",
+          "Blocco editoriale 300 parole su /giardino, /riscaldamento, /climatizzazione",
+          "llms.txt",
+          "Article schema sul template blog",
+          "Disavow siteindices.com e revool.net"
+        ]
+      },
+      {
+        "name": "Fase 4: Monitoraggio & Scala",
+        "timeframe": "Mese 3 e ongoing",
+        "items": [
+          "GSC: verifica copertura indice e CWV report",
+          "GA4 con eventi e-commerce",
+          "Campagna link building (fornitori, editoriale, CCIAA)",
+          "Integrazione BNPL (Scalapay/Klarna)",
+          "Audit crawl mensile con Screaming Frog da IP business",
+          "Monitoraggio AI Overview visibility"
+        ]
+      }
+    ]
+  },
+  "artifacts": {
+    "findings_dir": "findings/",
+    "screenshots_dir": "screenshots/"
+  }
+}
