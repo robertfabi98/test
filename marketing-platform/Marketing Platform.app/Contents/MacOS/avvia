@@ -31,10 +31,21 @@ $LOG\" as critical" >/dev/null 2>&1
   exit 1
 }
 
-# 1. Già accesa? Apro solo il browser
-if curl -fsS --max-time 2 "$URL/api/ping" >/dev/null 2>&1; then
-  open "$URL"
-  exit 0
+# 1. Già accesa? Se è la versione giusta apro solo il browser, se è vecchia la riavvio
+VERSIONE="$(cat "$APP_DIR/VERSION" 2>/dev/null)"
+PING="$(curl -fsS --max-time 2 "$URL/api/ping" 2>/dev/null)"
+if [ -n "$PING" ]; then
+  if printf '%s' "$PING" | grep -q "\"version\": *\"$VERSIONE\""; then
+    open "$URL"
+    exit 0
+  fi
+  echo "Trovata una versione vecchia in esecuzione: la chiudo e avvio la $VERSIONE"
+  avviso "Aggiorno la piattaforma alla nuova versione…"
+  curl -fsS --max-time 5 -X POST -H "X-MP: 1" "$URL/api/spegni" >/dev/null 2>&1
+  for _ in $(seq 1 20); do
+    curl -fsS --max-time 1 "$URL/api/ping" >/dev/null 2>&1 || break
+    sleep 0.5
+  done
 fi
 
 [ -d "$BACKEND/app" ] || errore "Non trovo i file della piattaforma accanto all'app. Tieni l'app dentro la cartella marketing-platform."

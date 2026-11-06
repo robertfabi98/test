@@ -20,6 +20,10 @@ from zoneinfo import ZoneInfo
 BASE_DIR = Path(__file__).resolve().parent.parent          # .../backend
 FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
 DEFAULT_STYLE_FILE = Path(__file__).resolve().parent / "stile_predefinito.md"
+try:
+    APP_VERSION = (BASE_DIR.parent / "VERSION").read_text("utf-8").strip()  # letta all'avvio
+except OSError:
+    APP_VERSION = "sviluppo"
 
 DATA_DIR = Path(
     os.getenv("MP_DATA_DIR", Path.home() / "Library" / "Application Support" / "MarketingPlatform")

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, type Status } from "./api";
+import { api, APP_VERSION, type Status } from "./api";
 import Setup from "./pages/Setup";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import SchedulePage from "./pages/SchedulePage";
@@ -63,6 +63,7 @@ export default function App() {
   const [setupDone, setSetupDone] = useState(() => localStorage.getItem("mp-setup") === "ok");
   const [closed, setClosed] = useState(false);
   const [draft, setDraft] = useState("");
+  const [oldEngine, setOldEngine] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -75,6 +76,11 @@ export default function App() {
 
   useEffect(() => {
     refresh();
+    // dopo un aggiornamento il motore vecchio può essere ancora acceso: va riavviato
+    api
+      .ping()
+      .then((p) => setOldEngine(p.version !== APP_VERSION))
+      .catch(() => undefined);
   }, [refresh]);
 
   const go = (s: Section) => {
@@ -101,6 +107,32 @@ export default function App() {
     return (
       <div className="center-screen">
         <p className="muted">{error ? `Non riesco a contattare la piattaforma: ${error}` : "Avvio…"}</p>
+      </div>
+    );
+  }
+
+  if (oldEngine) {
+    return (
+      <div className="center-screen">
+        <div className="card narrow">
+          <h1>Aggiornamento da completare</h1>
+          <p>
+            Hai scaricato una nuova versione, ma è ancora acceso il motore di quella vecchia. Chiudi la piattaforma e
+            riaprila con doppio clic sull'app: la prima volta ci mette circa un minuto.
+          </p>
+          <button
+            onClick={async () => {
+              try {
+                await api.shutdown();
+              } finally {
+                setOldEngine(false);
+                setClosed(true);
+              }
+            }}
+          >
+            Chiudi ora
+          </button>
+        </div>
       </div>
     );
   }

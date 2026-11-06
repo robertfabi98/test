@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { linksApi, type BufferLink, type ClaudeCodeStatus } from "../api";
 
+const RESTART_HINT =
+  "La piattaforma non risponde a questo controllo: di solito è ancora acceso il motore della versione precedente. " +
+  "Premi «Chiudi l'app» in basso a sinistra e riapri l'app con doppio clic.";
+
 // Claude tramite Claude Code: usa l'abbonamento Claude, nessuna chiave.
 export function ConnectClaude({ onChange }: { onChange?: () => void }) {
   const [st, setSt] = useState<ClaudeCodeStatus | null>(null);
@@ -56,7 +60,7 @@ export function ConnectClaude({ onChange }: { onChange?: () => void }) {
   const verify = () => run("Verifico…", () => load(true));
 
   let state: [string, string];
-  if (!st) state = ["Controllo…", ""];
+  if (!st) state = error ? ["Non risponde", "no"] : ["Controllo…", ""];
   else if (!st.installed) state = ["Da installare", "no"];
   else if (st.logged_in === true) state = ["Collegato", "ok"];
   else if (st.logged_in === false) state = ["Accesso da fare", "no"];
@@ -75,7 +79,7 @@ export function ConnectClaude({ onChange }: { onChange?: () => void }) {
         VS Code). L'uso conta nei limiti del tuo abbonamento.
       </p>
       {st?.error && <div className="notice small">{st.error}</div>}
-      {error && <div className="notice small">{error}</div>}
+      {error && <div className="notice small">{st ? error : RESTART_HINT}</div>}
       <div className="row wrap">
         {st && !st.installed && (
           <button disabled={!!busy || st.installing} onClick={install}>
@@ -151,7 +155,9 @@ export function ConnectBuffer({ onChange }: { onChange?: () => void }) {
 
   const linked = st?.mode === "mcp";
   const state: [string, string] = !st
-    ? ["Controllo…", ""]
+    ? error
+      ? ["Non risponde", "no"]
+      : ["Controllo…", ""]
     : linked
       ? ["Collegato", "ok"]
       : st.mode === "api"
@@ -173,7 +179,7 @@ export function ConnectBuffer({ onChange }: { onChange?: () => void }) {
         programmazione dei post.
       </p>
       {st?.state === "errore" && st.error && <div className="notice small">{st.error}</div>}
-      {error && <div className="notice small">{error}</div>}
+      {error && <div className="notice small">{st ? error : RESTART_HINT}</div>}
       {st?.state === "in_attesa" && (
         <div className="notice small">
           Si è aperta la pagina di Buffer nel browser: accedi e approva. Se non la vedi,{" "}

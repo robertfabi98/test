@@ -45,7 +45,7 @@ def _fail(exc: Exception) -> HTTPException:
 
 @app.get("/api/ping")
 def ping():
-    return {"ok": True, "app": "marketing-platform"}
+    return {"ok": True, "app": "marketing-platform", "version": config.APP_VERSION}
 
 
 @app.get("/api/stato")

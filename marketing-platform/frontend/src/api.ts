@@ -1,3 +1,6 @@
+declare const __APP_VERSION__: string;
+export const APP_VERSION = __APP_VERSION__;
+
 // Collegamento con il backend locale.
 
 export type Status = {
@@ -94,6 +97,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export const api = {
+  ping: () => request<{ ok: boolean; version?: string }>("GET", "/api/ping"),
   status: () => request<Status>("GET", "/api/stato"),
   settings: () => request<Settings>("GET", "/api/impostazioni"),
   saveSettings: (changes: Record<string, unknown>) => request<Settings>("PUT", "/api/impostazioni", changes),
