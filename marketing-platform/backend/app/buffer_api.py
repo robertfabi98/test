@@ -1,4 +1,8 @@
-"""Client minimo per l'API GraphQL di Buffer (https://developers.buffer.com)."""
+"""Collegamento a Buffer.
+
+Modo principale: il server MCP ufficiale di Buffer (accesso dal browser, nessuna chiave) - vedi buffer_mcp.py.
+Alternativa: l'API GraphQL con una chiave personale (Impostazioni → Avanzate).
+"""
 
 from __future__ import annotations
 
@@ -6,7 +10,7 @@ import json
 
 import requests
 
-from . import config
+from . import buffer_mcp, config
 
 # Campi che nello schema GraphQL di Buffer sono enum (vanno scritti senza virgolette)
 _ENUM_KEYS = {"schedulingType", "mode", "type", "field", "direction", "status"}
@@ -43,6 +47,26 @@ class BufferError(RuntimeError):
     pass
 
 
+def mode() -> str | None:
+    """"mcp" se Buffer è collegato con l'accesso dal browser, "api" se c'è una chiave, altrimenti None."""
+    if buffer_mcp.connected():
+        return "mcp"
+    if config.BUFFER_API_KEY:
+        return "api"
+    return None
+
+
+def available() -> bool:
+    return mode() is not None
+
+
+def _mcp(tool: str, args: dict):
+    try:
+        return buffer_mcp.call(tool, args)
+    except buffer_mcp.BufferMCPError as exc:
+        raise BufferError(str(exc)) from None
+
+
 def _gql(query: str, variables: dict | None = None) -> dict:
     if not config.BUFFER_API_KEY:
         raise BufferError("Inserisci la chiave di Buffer nelle Impostazioni")
@@ -68,10 +92,15 @@ def list_channels(refresh: bool = False) -> list[dict]:
     if _channels_cache is not None and not refresh:
         return _channels_cache
     try:
-        org = _literal({"organizationId": config.BUFFER_ORG_ID})
-        data = _gql(f"query GetChannels {{ channels(input: {org}) {{ id name service }} }}")
+        if mode() == "mcp":
+            data = _mcp("list_channels", {"organizationId": config.BUFFER_ORG_ID})
+        else:
+            org = _literal({"organizationId": config.BUFFER_ORG_ID})
+            data = _gql(f"query GetChannels {{ channels(input: {org}) {{ id name service }} }}")["channels"]
         _channels_cache = [
-            {"id": c["id"], "name": c["name"], "service": c["service"]} for c in data["channels"]
+            {"id": c["id"], "name": c.get("name") or c.get("displayName"), "service": c["service"]}
+            for c in data
+            if not c.get("isDisconnected")
         ]
     except (BufferError, requests.RequestException, KeyError, TypeError):
         _channels_cache = None
@@ -116,6 +145,12 @@ def build_post_input(
 
 
 def create_post(post_input: dict) -> dict:
+    if mode() == "mcp":
+        created = _mcp("create_post", post_input) or {}
+        post = created.get("post", created) if isinstance(created, dict) else {}
+        if not post.get("id"):
+            raise BufferError(str(created) or "Buffer non ha creato il post")
+        return post
     query = (
         f"mutation CreatePost {{ createPost(input: {_literal(post_input)}) {{"
         " ... on PostActionSuccess { post { id status dueAt } }"
@@ -144,6 +179,19 @@ def list_posts(
     with_metrics: bool = False, newest_first: bool = True,
 ) -> list[dict]:
     """Post dell'organizzazione con lo stato indicato (sent, scheduled, draft, error...)."""
+    if mode() == "mcp":
+        args: dict = {
+            "organizationId": config.BUFFER_ORG_ID,
+            "status": statuses,
+            "includeMetrics": with_metrics,
+            "sort": [{"field": "dueAt", "direction": "desc" if newest_first else "asc"}],
+        }
+        if channel_ids:
+            args["channelIds"] = channel_ids
+        try:
+            return buffer_mcp.call_pages("list_posts", args, limit)
+        except buffer_mcp.BufferMCPError as exc:
+            raise BufferError(str(exc)) from None
     filt: dict = {"status": statuses}
     if channel_ids:
         filt["channelIds"] = channel_ids

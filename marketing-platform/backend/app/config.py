@@ -42,6 +42,7 @@ IMAGE_EXT = {".jpg", ".jpeg", ".png"}
 # chiave -> (valore predefinito, è un segreto?)
 FIELDS: dict[str, tuple[Any, bool]] = {
     "media_dir": ("", False),
+    "claude_engine": ("claude_code", False),   # claude_code (abbonamento) | api (chiave a consumo)
     "anthropic_api_key": ("", True),
     "claude_model": ("claude-opus-5-5", False),
     "claude_effort": ("medium", False),

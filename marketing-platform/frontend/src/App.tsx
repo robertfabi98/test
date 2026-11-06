@@ -200,7 +200,7 @@ export default function App() {
             goToSchedule={() => go("programmazione")}
           />
         )}
-        {section === "impostazioni" && <SettingsPage onSaved={refresh} />}
+        {section === "impostazioni" && <SettingsPage onSaved={refresh} status={status} />}
       </div>
     </div>
   );

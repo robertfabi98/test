@@ -14,6 +14,7 @@ export type Status = {
 export type Secret = { impostato: boolean; anteprima: string };
 
 export type Settings = {
+  claude_engine: "claude_code" | "api";
   media_dir: string;
   anthropic_api_key: Secret;
   claude_model: string;
@@ -201,3 +202,31 @@ export function fmtNumber(n: number | undefined | null, decimals = 0): string {
     useGrouping: "always",
   } as unknown as Intl.NumberFormatOptions);
 }
+
+// ---------- collegamenti senza chiavi ----------
+
+export type ClaudeCodeStatus = {
+  installed: boolean;
+  path: string | null;
+  logged_in: boolean | null;
+  error: string | null;
+  installing: boolean;
+};
+
+export type BufferLink = {
+  state: "idle" | "in_attesa" | "collegato" | "errore";
+  url: string | null;
+  error: string | null;
+  connected: boolean;
+  mode: "mcp" | "api" | null;
+  org_id: string;
+};
+
+export const linksApi = {
+  claudeCode: (verify = false) => request<ClaudeCodeStatus>("GET", `/api/claude-code${verify ? "?verifica=true" : ""}`),
+  installClaudeCode: () => request<ClaudeCodeStatus>("POST", "/api/claude-code/installa"),
+  loginClaudeCode: () => request<ClaudeCodeStatus>("POST", "/api/claude-code/accedi"),
+  buffer: () => request<BufferLink>("GET", "/api/buffer"),
+  connectBuffer: () => request<BufferLink>("POST", "/api/buffer/collega"),
+  disconnectBuffer: () => request<BufferLink>("POST", "/api/buffer/scollega"),
+};

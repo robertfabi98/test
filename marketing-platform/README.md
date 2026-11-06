@@ -30,11 +30,11 @@ Hard disk ──► Backend (sul Mac) ◄──► Interfaccia nel browser
    - Se il Mac chiede di accedere ai file dell'hard disk esterno, scegli **Consenti**.
    - Consiglio: trascina l'app nel Dock, così la apri con un clic.
 
-Al primo avvio una **configurazione guidata** ti chiede:
-- la cartella dell'hard disk dove salvi i video finiti
-- la chiave di Claude: https://console.anthropic.com/settings/keys (si paga a consumo)
-- la chiave di Buffer: https://publish.buffer.com/settings/api
-- i dati di Cloudinary (gratuito): Dashboard → API Keys → "API environment variable"
+Al primo avvio una **configurazione guidata** ti chiede, senza nessuna chiave API da pagare:
+- **la cartella** dell'hard disk dove salvi i video finiti
+- **Claude**, tramite **Claude Code** e il tuo abbonamento Claude, lo stesso account che usi in VS Code. Se Claude Code non è installato c'è il pulsante "Installa Claude Code". "Accedi a Claude" apre il Terminale per fare l'accesso la prima volta.
+- **Buffer**, con il pulsante **"Accedi con Buffer"**: si apre il browser, accedi e approvi. Il collegamento passa dal server MCP ufficiale di Buffer.
+- **Cloudinary** (facoltativo, gratuito, senza carta di credito): serve solo per pubblicare davvero, perché Buffer vuole un link pubblico al video.
 
 Puoi saltare un passaggio e completarlo dopo da **Impostazioni**.
 
@@ -64,6 +64,7 @@ Per il primo post reale scegli un orario lontano qualche ora e controlla in Buff
 - **Dove stanno i tuoi dati:** impostazioni, chiavi, anteprime, trascrizioni e piano sono nella cartella `Libreria/Application Support/MarketingPlatform` del tuo utente. Restano lì anche quando aggiorni l'app.
 - **Se qualcosa non parte:** l'app mostra un messaggio e apre il file `avvio.log`. Mandalo a Claude.
 - **Trascrizione:** gira sul Mac ed è gratuita. Al primo utilizzo scarica il modello (qualche centinaio di MB).
+- **Uso di Claude:** la chat usa Claude Code con il tuo abbonamento, quindi conta nei limiti del tuo piano Claude e non ha costi extra. In Impostazioni → Avanzate puoi passare a una chiave API a consumo, se preferisci.
 - **Limiti dei piani gratuiti:** Buffer accetta al massimo 10 post in coda. Cloudinary ha limiti di spazio e di dimensione per file.
 - **Musica di tendenza** di Instagram e TikTok: con la pubblicazione automatica non si può aggiungere. L'audio va messo già nel montaggio.
 
@@ -81,12 +82,16 @@ marketing-platform/
 │       ├── config.py        impostazioni salvate da interfaccia
 │       ├── library.py       clip dal disco, anteprime (PyAV + Pillow), sfoglia cartelle
 │       ├── transcribe.py    Whisper locale (faster-whisper)
-│       ├── agent.py         chat con Claude e i suoi strumenti
+│       ├── agent.py         chat: Claude Code (abbonamento) oppure API con chiave
+│       ├── claude_code.py   avvio di `claude -p` collegato al server MCP della piattaforma
+│       ├── mcp_server.py    server MCP con gli strumenti della piattaforma (usato da Claude Code)
+│       ├── tools.py         strumenti e istruzioni di Claude
+│       ├── buffer_mcp.py    client MCP di Buffer con accesso OAuth dal browser
 │       ├── plan.py          proposte, conferma, programmazione
 │       ├── schedule.py      calendario (proposte + coda di Buffer)
 │       ├── analytics.py     analytics per piattaforma dai post di Buffer
 │       ├── cloud.py         caricamento su Cloudinary
-│       └── buffer_api.py    API GraphQL di Buffer
+│       └── buffer_api.py    Buffer: via MCP (predefinito) o API GraphQL con chiave
 └── frontend/                React + Vite + TypeScript (dist/ già compilata e inclusa)
 ```
 

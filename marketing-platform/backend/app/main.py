@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import agent, analytics, buffer_api, config, library, plan, schedule, transcribe
+from . import agent, analytics, buffer_api, buffer_mcp, claude_code, config, library, plan, schedule, transcribe
 
 app = FastAPI(title="Marketing Platform", docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -50,7 +50,70 @@ def ping():
 
 @app.get("/api/stato")
 def stato():
-    return config.status()
+    st = config.status()
+    st["buffer"] = buffer_api.available()
+    st["buffer_mode"] = buffer_api.mode()
+    st["claude_engine"] = config.get("claude_engine")
+    if st["claude_engine"] == "api":
+        st["claude"] = bool(config.get("anthropic_api_key"))
+    else:
+        cc = claude_code.status()
+        st["claude"] = cc["installed"] and cc["logged_in"] is not False
+    return st
+
+
+# ---------- collegamenti senza chiavi: Claude Code e Buffer via MCP ----------
+
+@app.get("/api/claude-code")
+def cc_status(verifica: bool = False):
+    return claude_code.status(check_login=verifica)
+
+
+@app.post("/api/claude-code/installa")
+def cc_install():
+    claude_code.install()
+    return claude_code.status()
+
+
+@app.post("/api/claude-code/accedi")
+def cc_login():
+    try:
+        claude_code.open_login()
+    except Exception as exc:  # noqa: BLE001
+        raise _fail(exc) from None
+    return claude_code.status()
+
+
+@app.get("/api/buffer")
+def buffer_status():
+    return {**buffer_mcp.login_status(), "mode": buffer_api.mode(), "org_id": config.get("buffer_org_id")}
+
+
+@app.post("/api/buffer/collega")
+def buffer_connect():
+    buffer_mcp.start_login()
+    return buffer_mcp.login_status()
+
+
+@app.post("/api/buffer/scollega")
+def buffer_disconnect():
+    buffer_mcp.disconnect()
+    buffer_api.list_channels(refresh=True)
+    return buffer_mcp.login_status()
+
+
+@app.get("/oauth/buffer/callback")
+def buffer_callback(code: str | None = None, state: str | None = None, error: str | None = None):
+    from fastapi.responses import HTMLResponse
+
+    buffer_mcp.oauth_callback(code, state, error)
+    msg = "Buffer è collegato. Puoi chiudere questa scheda e tornare alla Marketing Platform." if code else \
+        "Accesso a Buffer non riuscito. Torna alla Marketing Platform e riprova."
+    return HTMLResponse(
+        f"<!doctype html><meta charset=utf-8><title>Buffer</title>"
+        f"<body style='font-family:-apple-system,sans-serif;display:grid;place-items:center;height:90vh'>"
+        f"<p style='font-size:18px'>{msg}</p><script>setTimeout(()=>window.close(),2500)</script></body>"
+    )
 
 
 @app.get("/api/impostazioni")
@@ -61,6 +124,7 @@ def settings_get():
 class SettingsIn(BaseModel):
     media_dir: str | None = None
     anthropic_api_key: str | None = None
+    claude_engine: str | None = None
     claude_model: str | None = None
     claude_effort: str | None = None
     buffer_api_key: str | None = None
@@ -74,6 +138,8 @@ class SettingsIn(BaseModel):
 @app.put("/api/impostazioni")
 def settings_put(body: SettingsIn):
     changes: dict[str, Any] = {k: v for k, v in body.model_dump().items() if v is not None}
+    if "claude_engine" in changes and changes["claude_engine"] not in ("claude_code", "api"):
+        raise HTTPException(400, "Motore non valido")
     if "claude_effort" in changes and changes["claude_effort"] not in ("low", "medium", "high"):
         raise HTTPException(400, "Livello non valido")
     if "cloudinary_url" in changes and changes["cloudinary_url"] and not changes["cloudinary_url"].startswith(
@@ -246,14 +312,14 @@ def plan_cancel(item_id: str):
 
 @app.get("/api/analytics")
 def analytics_overview(giorni: int = 30, aggiorna: bool = False):
-    if not config.BUFFER_API_KEY:
+    if not buffer_api.available():
         raise HTTPException(400, "Collega Buffer nelle Impostazioni per vedere le analytics")
     return analytics.overview(max(1, min(giorni, 365)), aggiorna)
 
 
 @app.get("/api/analytics/{channel_id}")
 def analytics_channel(channel_id: str, giorni: int = 30, aggiorna: bool = False):
-    if not config.BUFFER_API_KEY:
+    if not buffer_api.available():
         raise HTTPException(400, "Collega Buffer nelle Impostazioni per vedere le analytics")
     try:
         return analytics.channel_report(channel_id, max(1, min(giorni, 365)), aggiorna)

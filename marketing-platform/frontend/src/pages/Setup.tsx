@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, type Settings } from "../api";
 import FolderPicker from "../components/FolderPicker";
 import SecretField from "../components/SecretField";
+import { ConnectBuffer, ConnectClaude } from "../components/Connections";
 
 const STEPS = ["Cartella", "Claude", "Buffer", "Cloudinary", "Fatto"];
 
@@ -62,42 +63,28 @@ export default function Setup({ onDone }: { onDone: () => void }) {
         {step === 1 && (
           <>
             <h1>Collega Claude</h1>
-            <p>Claude scrive titoli e descrizioni e prepara il piano di pubblicazione. Serve una chiave API (si paga a consumo).</p>
-            <SecretField
-              label="Chiave di Claude"
-              help="Crea la chiave e incollala qui:"
-              link="https://console.anthropic.com/settings/keys"
-              linkLabel="console.anthropic.com"
-              current={settings?.anthropic_api_key}
-              value={value}
-              onChange={setValue}
-              placeholder="sk-ant-…"
-            />
+            <p>
+              Claude scrive titoli e descrizioni e prepara il piano. Lo colleghiamo tramite Claude Code, con il tuo abbonamento:
+              nessuna chiave API da pagare.
+            </p>
+            <ConnectClaude />
           </>
         )}
 
         {step === 2 && (
           <>
             <h1>Collega Buffer</h1>
-            <p>Buffer pubblica i post su Instagram, TikTok e YouTube agli orari che confermi.</p>
-            <SecretField
-              label="Chiave di Buffer"
-              help="Creala nelle impostazioni API di Buffer:"
-              link="https://publish.buffer.com/settings/api"
-              linkLabel="publish.buffer.com/settings/api"
-              current={settings?.buffer_api_key}
-              value={value}
-              onChange={setValue}
-            />
+            <p>Buffer pubblica su Instagram, TikTok e YouTube e fornisce le analytics. Si collega con il tuo account, senza chiavi.</p>
+            <ConnectBuffer />
           </>
         )}
 
         {step === 3 && (
           <>
-            <h1>Collega Cloudinary</h1>
+            <h1>Collega Cloudinary (facoltativo)</h1>
             <p>
-              Buffer ha bisogno di un link pubblico al video. Cloudinary lo crea: la piattaforma ci carica da sola i file
-              quando confermi un post. Il piano gratuito basta per iniziare.
+              Serve solo quando pubblichi davvero: Buffer vuole un link pubblico al video e Cloudinary lo crea. L'account
+              gratuito non richiede carta di credito. Puoi farlo anche più tardi.
             </p>
             <SecretField
               label="API environment variable"
@@ -126,14 +113,15 @@ export default function Setup({ onDone }: { onDone: () => void }) {
         {error && <div className="notice">{error}</div>}
 
         <div className="row wrap setup-actions">
-          {step >= 1 && step <= 3 && (
+          {(step === 1 || step === 2) && (
             <>
-              <button
-                disabled={saving || !value.trim()}
-                onClick={() =>
-                  save({ [["anthropic_api_key", "buffer_api_key", "cloudinary_url"][step - 1]]: value.trim() })
-                }
-              >
+              <button onClick={skip}>Continua</button>
+              <span className="muted small">Puoi completare il collegamento anche dopo, dalle Impostazioni.</span>
+            </>
+          )}
+          {step === 3 && (
+            <>
+              <button disabled={saving || !value.trim()} onClick={() => save({ cloudinary_url: value.trim() })}>
                 {saving ? "Salvo…" : "Salva e continua"}
               </button>
               <button className="ghost" onClick={skip}>

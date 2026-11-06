@@ -32,7 +32,7 @@ def calendar() -> dict:
             )
 
     buffer_error = None
-    if config.BUFFER_API_KEY:
+    if buffer_api.available():
         try:
             channels = {c["id"]: c for c in buffer_api.list_channels()}
             for p in buffer_api.list_posts(statuses=["scheduled", "error"], limit=100, newest_first=False):

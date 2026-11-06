@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { api, type Settings } from "../api";
+import { api, type Settings, type Status } from "../api";
 import FolderPicker from "../components/FolderPicker";
 import SecretField from "../components/SecretField";
+import { ConnectBuffer, ConnectClaude } from "../components/Connections";
 import StylePage from "./StylePage";
 
 const SECTIONS: [string, string][] = [
@@ -12,7 +13,7 @@ const SECTIONS: [string, string][] = [
   ["avanzate", "Avanzate"],
 ];
 
-export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
+export default function SettingsPage({ onSaved, status }: { onSaved: () => void; status: Status }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [keys, setKeys] = useState({ anthropic_api_key: "", buffer_api_key: "", cloudinary_url: "" });
   const [form, setForm] = useState({ claude_effort: "medium", youtube_category_id: "22", whisper_model: "small" });
@@ -47,7 +48,7 @@ export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
 
   if (!settings) return <div className="page">{error || "Carico…"}</div>;
 
-  const connected = [settings.anthropic_api_key, settings.buffer_api_key, settings.cloudinary_url].filter((k) => k.impostato).length;
+  const connected = [status.claude, status.buffer, status.cloudinary].filter(Boolean).length;
 
   return (
     <div className="page">
@@ -113,31 +114,25 @@ export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
         )}
 
         {section === "collegamenti" && (
+        <>
         <section className="card">
           <h2>Collegamenti</h2>
-          <p className="muted">Le chiavi restano salvate solo su questo Mac.</p>
+          <p className="muted">
+            Claude e Buffer si collegano senza chiavi a pagamento: Claude tramite Claude Code e il tuo abbonamento, Buffer
+            tramite il suo server MCP ufficiale.
+          </p>
+          <ConnectClaude onChange={onSaved} />
+          <ConnectBuffer onChange={onSaved} />
+        </section>
+        <section className="card">
+          <h2>Cloudinary <span className="muted">· solo per pubblicare</span></h2>
+          <p className="muted small">
+            Buffer vuole un link pubblico al video: Cloudinary lo crea. Il piano gratuito non richiede carta di credito e basta per
+            iniziare. Analytics, calendario e chat funzionano anche senza.
+          </p>
           <SecretField
-            label="Chiave di Claude"
-            help="Da"
-            link="https://console.anthropic.com/settings/keys"
-            linkLabel="console.anthropic.com"
-            current={settings.anthropic_api_key}
-            value={keys.anthropic_api_key}
-            onChange={(v) => setKeys({ ...keys, anthropic_api_key: v })}
-            placeholder="sk-ant-…"
-          />
-          <SecretField
-            label="Chiave di Buffer"
-            help="Da"
-            link="https://publish.buffer.com/settings/api"
-            linkLabel="publish.buffer.com/settings/api"
-            current={settings.buffer_api_key}
-            value={keys.buffer_api_key}
-            onChange={(v) => setKeys({ ...keys, buffer_api_key: v })}
-          />
-          <SecretField
-            label="Cloudinary (API environment variable)"
-            help="Dashboard → API Keys:"
+            label="API environment variable"
+            help="Crea un account gratuito, poi Dashboard → API Keys:"
             link="https://console.cloudinary.com/"
             linkLabel="console.cloudinary.com"
             current={settings.cloudinary_url}
@@ -145,15 +140,11 @@ export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
             onChange={(v) => setKeys({ ...keys, cloudinary_url: v })}
             placeholder="cloudinary://…"
           />
-          <button
-            disabled={!Object.values(keys).some((v) => v.trim())}
-            onClick={() =>
-              save(Object.fromEntries(Object.entries(keys).filter(([, v]) => v.trim())), "Chiavi salvate")
-            }
-          >
-            Salva chiavi
+          <button disabled={!keys.cloudinary_url.trim()} onClick={() => save({ cloudinary_url: keys.cloudinary_url.trim() }, "Cloudinary collegato")}>
+            Salva
           </button>
         </section>
+        </>
         )}
 
         {section === "stile" && <StylePage embedded />}
@@ -162,7 +153,7 @@ export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
         <section className="card">
           <h2>Avanzate</h2>
           <label className="field">
-            <span className="field-label">Quanto ragiona Claude</span>
+            <span className="field-label">Quanto ragiona Claude (solo con la chiave API)</span>
             <select value={form.claude_effort} onChange={(e) => setForm({ ...form, claude_effort: e.target.value })}>
               <option value="low">Veloce (costa meno)</option>
               <option value="medium">Equilibrato (consigliato)</option>
@@ -190,6 +181,62 @@ export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
           </label>
           <button className="ghost" onClick={() => save(form)}>
             Salva
+          </button>
+        </section>
+        )}
+
+        {section === "avanzate" && (
+        <section className="card">
+          <h2>Alternative con chiave API</h2>
+          <p className="muted small">
+            Non servono se usi Claude Code e l'accesso a Buffer. La chiave di Claude si paga a consumo; quella di Buffer è gratuita.
+          </p>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={settings.claude_engine === "api"}
+              onChange={(e) => save({ claude_engine: e.target.checked ? "api" : "claude_code" }, e.target.checked ? "La chat usa la chiave API" : "La chat usa Claude Code")}
+            />
+            <span>
+              <strong>Usa la chiave API di Claude invece di Claude Code</strong>
+              <br />
+              <span className="muted small">A consumo, fatturata da Anthropic. Spento = Claude Code con il tuo abbonamento.</span>
+            </span>
+          </label>
+          {settings.claude_engine === "api" && (
+            <SecretField
+              label="Chiave di Claude"
+              help="Da"
+              link="https://console.anthropic.com/settings/keys"
+              linkLabel="console.anthropic.com"
+              current={settings.anthropic_api_key}
+              value={keys.anthropic_api_key}
+              onChange={(v) => setKeys({ ...keys, anthropic_api_key: v })}
+              placeholder="sk-ant-…"
+            />
+          )}
+          <SecretField
+            label="Chiave di Buffer (se non usi l'accesso MCP)"
+            help="Da"
+            link="https://publish.buffer.com/settings/api"
+            linkLabel="publish.buffer.com/settings/api"
+            current={settings.buffer_api_key}
+            value={keys.buffer_api_key}
+            onChange={(v) => setKeys({ ...keys, buffer_api_key: v })}
+          />
+          <button
+            className="ghost"
+            disabled={!keys.anthropic_api_key.trim() && !keys.buffer_api_key.trim()}
+            onClick={() =>
+              save(
+                Object.fromEntries(
+                  Object.entries({ anthropic_api_key: keys.anthropic_api_key, buffer_api_key: keys.buffer_api_key }).filter(([, v]) => v.trim()),
+                ),
+                "Chiavi salvate",
+              )
+            }
+          >
+            Salva chiavi
           </button>
         </section>
         )}
