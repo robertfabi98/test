@@ -1,0 +1,128 @@
+"""Client minimo per l'API GraphQL di Buffer (https://developers.buffer.com)."""
+
+from __future__ import annotations
+
+import json
+
+import requests
+
+from . import config
+
+# Campi che nello schema GraphQL di Buffer sono enum (vanno scritti senza virgolette)
+_ENUM_KEYS = {"schedulingType", "mode", "type"}
+
+
+def _literal(value, key: str | None = None) -> str:
+    """Converte un dict Python in un letterale GraphQL, come negli esempi di Buffer."""
+    if isinstance(value, dict):
+        inner = ", ".join(f"{k}: {_literal(v, k)}" for k, v in value.items() if v is not None)
+        return "{ " + inner + " }"
+    if isinstance(value, list):
+        return "[" + ", ".join(_literal(v) for v in value) + "]"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return str(value)
+    if key in _ENUM_KEYS:
+        if not str(value).isidentifier():
+            raise ValueError(f"Valore non valido per {key}: {value!r}")
+        return str(value)
+    return json.dumps(str(value), ensure_ascii=False)
+
+# Canali già collegati al tuo Buffer, usati se l'API non risponde
+FALLBACK_CHANNELS = [
+    {"id": "6ad06d43778b240e2f14bb94", "name": "iamrobertfabi_", "service": "instagram"},
+    {"id": "6ad06d59778b240e2f14c051", "name": "iamrobertfabi", "service": "tiktok"},
+    {"id": "6ad06d6e778b240e2f14c13c", "name": "Robert Fabi", "service": "youtube"},
+]
+
+_channels_cache: list[dict] | None = None
+
+
+class BufferError(RuntimeError):
+    pass
+
+
+def _gql(query: str, variables: dict | None = None) -> dict:
+    if not config.BUFFER_API_KEY:
+        raise BufferError("Manca BUFFER_API_KEY nel file .env")
+    resp = requests.post(
+        config.BUFFER_API_URL,
+        json={"query": query, "variables": variables or {}},
+        headers={"Authorization": f"Bearer {config.BUFFER_API_KEY}"},
+        timeout=60,
+    )
+    try:
+        body = resp.json()
+    except ValueError:
+        raise BufferError(f"Risposta non valida da Buffer (HTTP {resp.status_code})") from None
+    if body.get("errors"):
+        raise BufferError("; ".join(e.get("message", str(e)) for e in body["errors"]))
+    if resp.status_code >= 400:
+        raise BufferError(f"Errore Buffer HTTP {resp.status_code}")
+    return body["data"]
+
+
+def list_channels(refresh: bool = False) -> list[dict]:
+    global _channels_cache
+    if _channels_cache is not None and not refresh:
+        return _channels_cache
+    try:
+        org = _literal({"organizationId": config.BUFFER_ORG_ID})
+        data = _gql(f"query GetChannels {{ channels(input: {org}) {{ id name service }} }}")
+        _channels_cache = [
+            {"id": c["id"], "name": c["name"], "service": c["service"]} for c in data["channels"]
+        ]
+    except (BufferError, requests.RequestException, KeyError, TypeError):
+        _channels_cache = None
+        return FALLBACK_CHANNELS
+    return _channels_cache
+
+
+def build_post_input(
+    *, channel: dict, text: str, media_url: str, media_kind: str, due_at: str,
+    title: str = "", ig_type: str = "",
+) -> dict:
+    """Costruisce l'input di createPost come richiesto da Buffer per ogni social."""
+    service = channel["service"]
+    if media_kind == "video":
+        asset = {"video": {"url": media_url}}
+    else:
+        asset = {"image": {"url": media_url, "metadata": {"altText": title or text[:120]}}}
+
+    post: dict = {
+        "channelId": channel["id"],
+        "text": text,
+        "schedulingType": "automatic",
+        "mode": "customScheduled",
+        "dueAt": due_at,
+        "assets": [asset],
+    }
+    if service == "instagram":
+        # un singolo video nel feed va pubblicato come reel
+        kind = ig_type or ("reel" if media_kind == "video" else "post")
+        post["metadata"] = {"instagram": {"type": kind, "shouldShareToFeed": True}}
+    elif service == "youtube":
+        if media_kind != "video":
+            raise BufferError("YouTube accetta solo video")
+        post["metadata"] = {
+            "youtube": {"title": (title or text)[:100], "categoryId": config.YOUTUBE_CATEGORY_ID}
+        }
+    elif service == "tiktok" and title:
+        post["metadata"] = {"tiktok": {"title": title}}
+    elif service == "facebook":
+        post["metadata"] = {"facebook": {"type": "reel" if media_kind == "video" else "post"}}
+    return post
+
+
+def create_post(post_input: dict) -> dict:
+    query = (
+        f"mutation CreatePost {{ createPost(input: {_literal(post_input)}) {{"
+        " ... on PostActionSuccess { post { id status dueAt } }"
+        " ... on MutationError { message } } }"
+    )
+    data = _gql(query)
+    result = data.get("createPost") or {}
+    if "post" in result:
+        return result["post"]
+    raise BufferError(result.get("message", "Buffer non ha creato il post"))
