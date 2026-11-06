@@ -13,47 +13,28 @@ Hard disk ──► Libreria ──► Chat con Claude ──► Piano (tu confe
 
 ---
 
-## Installazione (una volta sola)
+## Installazione e avvio (il modo semplice)
 
-Apri il Terminale (o il terminale di VS Code) ed esegui questi comandi uno alla volta.
-
-**1. Strumenti di base.** Se non hai Homebrew, installalo prima da https://brew.sh
+1. Installa Homebrew da https://brew.sh (se non ce l'hai), poi nel Terminale:
 
 ```bash
 brew install python ffmpeg
 ```
 
-**2. Scarica il progetto** (se l'hai già scaricato, entra nella cartella e usa `git pull`)
+2. Scarica il progetto:
 
 ```bash
-git clone https://github.com/robertfabi98/test.git
+cd ~/Documents && git clone https://github.com/robertfabi98/test.git && cd test && git checkout claude/great-ramanujan-uy5xhq
 ```
 
-```bash
-cd test/marketing-platform
-```
+3. Nel Finder apri `Documenti/test/marketing-platform` e fai **doppio clic su `avvia.command`**.
+   - La prima volta installa tutto (qualche minuto) e apre il file `.env`: scrivi il percorso dell'hard disk accanto a `MEDIA_DIR`, salva e fai di nuovo doppio clic su `avvia.command`.
+   - Le volte successive parte subito e apre il browser su http://127.0.0.1:8765
+   - Se il Mac dice che non può aprire il file: tasto destro su `avvia.command` → **Apri** → **Apri**.
 
-**3. Ambiente Python e librerie**
+**Importante:** la finestra del Terminale che si apre deve restare aperta mentre usi la piattaforma. Se la chiudi, l'indirizzo dà errore.
 
-```bash
-python3 -m venv .venv
-```
-
-```bash
-source .venv/bin/activate
-```
-
-```bash
-pip install -r requirements.txt
-```
-
-**4. File di configurazione**
-
-```bash
-cp .env.example .env
-```
-
-Poi apri `.env` in VS Code e compila i valori (vedi sotto). Il file `.env` contiene le tue chiavi: resta solo sul tuo Mac e non viene mai caricato su GitHub.
+Per aggiornare la piattaforma quando ci sono novità: nel Terminale `cd ~/Documents/test && git pull`.
 
 ## Le chiavi da inserire nel file `.env`
 
@@ -66,15 +47,10 @@ Poi apri `.env` in VS Code e compila i valori (vedi sotto). Il file `.env` conti
 
 `BUFFER_ORG_ID` è già compilato con la tua organizzazione Buffer.
 
-## Avvio
+## Se l'indirizzo dà errore
 
-Ogni volta che vuoi usarla:
-
-```bash
-cd test/marketing-platform && source .venv/bin/activate && python app.py
-```
-
-Si apre il browser su http://127.0.0.1:8765. In alto vedi lo stato di ogni collegamento (verde = ok). Per chiuderla premi `Ctrl+C` nel terminale.
+- La piattaforma è accesa solo mentre la finestra del Terminale di `avvia.command` è aperta. Rifai doppio clic su `avvia.command`.
+- Se nella finestra compare un errore, copialo e mandalo a Claude.
 
 ## Come si usa
 

@@ -19,7 +19,7 @@ def _get_model():
                 from faster_whisper import WhisperModel
             except ImportError as exc:
                 raise RuntimeError(
-                    "Whisper non è installato. Esegui: pip install faster-whisper"
+                    "Whisper non è installato. Esegui: .venv/bin/pip install -r requirements-whisper.txt"
                 ) from exc
             _model = WhisperModel(config.WHISPER_MODEL, device="cpu", compute_type="int8")
         return _model

@@ -4,5 +4,3 @@ uvicorn>=0.30
 python-dotenv>=1.0
 requests>=2.31
 cloudinary>=1.40
-# trascrizione locale (scarica il modello Whisper al primo utilizzo)
-faster-whisper>=1.0

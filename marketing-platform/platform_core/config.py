@@ -47,6 +47,8 @@ DRY_RUN = os.getenv("DRY_RUN", "1") == "1"
 
 # Cloudinary (link pubblici per i file): cloudinary://API_KEY:API_SECRET@CLOUD_NAME
 CLOUDINARY_URL = os.getenv("CLOUDINARY_URL", "")
+if "API_KEY:API_SECRET" in CLOUDINARY_URL:  # valore di esempio del .env.example
+    CLOUDINARY_URL = ""
 CLOUDINARY_FOLDER = os.getenv("CLOUDINARY_FOLDER", "marketing-platform")
 
 HOST = os.getenv("HOST", "127.0.0.1")
