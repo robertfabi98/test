@@ -45,7 +45,7 @@ class BufferError(RuntimeError):
 
 def _gql(query: str, variables: dict | None = None) -> dict:
     if not config.BUFFER_API_KEY:
-        raise BufferError("Manca BUFFER_API_KEY nel file .env")
+        raise BufferError("Inserisci la chiave di Buffer nelle Impostazioni")
     resp = requests.post(
         config.BUFFER_API_URL,
         json={"query": query, "variables": variables or {}},

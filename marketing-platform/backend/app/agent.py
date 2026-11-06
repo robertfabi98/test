@@ -13,8 +13,6 @@ import anthropic
 
 from . import buffer_api, config, library, plan, transcribe
 
-_STYLE_FILE = config.BASE_DIR / "brand" / "stile.md"
-
 SYSTEM_PROMPT = """Sei il social media manager personale di Robert Fabi e lavori dentro la sua \
 piattaforma di marketing. Robert è un consulente di marketing e personal branding per professionisti \
 e piccole imprese; i suoi contenuti sono clip video brevi (reel, TikTok, YouTube Shorts).
@@ -129,12 +127,6 @@ TOOLS = [
 ]
 
 
-def _style() -> str:
-    if _STYLE_FILE.exists():
-        return _STYLE_FILE.read_text("utf-8")
-    return ""
-
-
 def _run_tool(name: str, args: dict) -> tuple[str, str]:
     """Esegue uno strumento. Restituisce (risultato per Claude, descrizione per l'interfaccia)."""
     if name == "elenca_clip":
@@ -176,7 +168,7 @@ def _run_tool(name: str, args: dict) -> tuple[str, str]:
 
 def _explain(exc: anthropic.APIError) -> str:
     if isinstance(exc, anthropic.AuthenticationError):
-        return "Chiave ANTHROPIC_API_KEY non valida"
+        return "La chiave di Claude non è valida: controllala nelle Impostazioni"
     if isinstance(exc, anthropic.RateLimitError):
         return "Troppe richieste a Claude, riprova tra un minuto"
     if isinstance(exc, anthropic.APIConnectionError):
@@ -196,12 +188,15 @@ class ChatSession:
         self.transcript: list[dict] = []  # versione leggibile per l'interfaccia
         self._lock = threading.Lock()
         self._client: anthropic.Anthropic | None = None
+        self._client_key = ""
 
     def _get_client(self) -> anthropic.Anthropic:
-        if self._client is None:
-            if not config.ANTHROPIC_API_KEY:
-                raise RuntimeError("Manca ANTHROPIC_API_KEY nel file .env")
-            self._client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY, base_url=config.CLAUDE_API_URL)
+        key = config.ANTHROPIC_API_KEY
+        if not key:
+            raise RuntimeError("Inserisci la chiave di Claude nelle Impostazioni")
+        if self._client is None or self._client_key != key:
+            self._client = anthropic.Anthropic(api_key=key, base_url=config.CLAUDE_API_URL)
+            self._client_key = key
         return self._client
 
     def reset(self) -> None:
@@ -211,7 +206,7 @@ class ChatSession:
 
     def _system(self) -> list[dict]:
         text = SYSTEM_PROMPT
-        style = _style()
+        style = config.style_text()
         if style:
             text += "\n\n# Stile di Robert\n\n" + style
         # testo stabile: viene messo in cache e costa meno dalla seconda richiesta

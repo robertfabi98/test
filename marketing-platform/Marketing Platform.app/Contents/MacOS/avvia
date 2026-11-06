@@ -1,0 +1,74 @@
+#!/bin/bash
+# Marketing Platform: si avvia con doppio clic sull'app.
+# La prima volta scarica da solo Python e le librerie (qualche minuto), poi apre il browser.
+
+APP_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"      # cartella marketing-platform
+BACKEND="$APP_DIR/backend"
+DATA="$HOME/Library/Application Support/MarketingPlatform"
+TOOLS="$HOME/.marketing-platform"                       # Python e strumenti della piattaforma
+VENV="$TOOLS/python"
+LOG="$DATA/avvio.log"
+URL="http://127.0.0.1:8765"
+export PATH="$TOOLS/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+set -o pipefail
+
+mkdir -p "$DATA" "$TOOLS"
+# il registro resta piccolo: tiene solo le ultime righe
+[ -f "$LOG" ] && tail -n 2000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
+exec >>"$LOG" 2>&1
+echo "=== Avvio $(date) da $APP_DIR ==="
+
+avviso() {
+  osascript -e "display notification \"$1\" with title \"Marketing Platform\"" >/dev/null 2>&1 || true
+}
+errore() {
+  echo "ERRORE: $1"
+  osascript -e "display alert \"Marketing Platform\" message \"$1
+
+Se il problema continua, manda a Claude il file:
+$LOG\" as critical" >/dev/null 2>&1
+  open -R "$LOG" 2>/dev/null
+  exit 1
+}
+
+# 1. Già accesa? Apro solo il browser
+if curl -fsS --max-time 2 "$URL/api/ping" >/dev/null 2>&1; then
+  open "$URL"
+  exit 0
+fi
+
+[ -d "$BACKEND/app" ] || errore "Non trovo i file della piattaforma accanto all'app. Tieni l'app dentro la cartella marketing-platform."
+
+# 2. uv: gestisce Python senza bisogno di Homebrew o del Terminale
+UV="$TOOLS/bin/uv"
+if [ ! -x "$UV" ]; then
+  avviso "Prima apertura: scarico i componenti, ci vuole qualche minuto…"
+  curl -LsSf https://astral.sh/uv/install.sh \
+    | env UV_INSTALL_DIR="$TOOLS/bin" UV_NO_MODIFY_PATH=1 sh \
+    || errore "Non riesco a scaricare i componenti. Controlla la connessione a internet e riprova."
+fi
+[ -x "$UV" ] || errore "Installazione dei componenti non riuscita."
+
+# 3. Python e librerie: solo la prima volta o dopo un aggiornamento
+if [ ! -x "$VENV/bin/python" ] || ! cmp -s "$BACKEND/requirements.txt" "$VENV/.requisiti"; then
+  avviso "Preparo la piattaforma (solo la prima volta o dopo un aggiornamento)…"
+  if [ ! -x "$VENV/bin/python" ]; then
+    "$UV" venv --python 3.12 "$VENV" || errore "Non riesco a preparare Python."
+  fi
+  "$UV" pip install --python "$VENV/bin/python" -r "$BACKEND/requirements.txt" \
+    || errore "Installazione delle librerie non riuscita. Controlla la connessione a internet e riprova."
+  cp "$BACKEND/requirements.txt" "$VENV/.requisiti"
+fi
+
+# 4. Avvio del backend e apertura dell'interfaccia
+cd "$BACKEND" || errore "Cartella backend non trovata."
+nohup "$VENV/bin/python" -m app.main >>"$LOG" 2>&1 &
+for _ in $(seq 1 90); do
+  if curl -fsS --max-time 2 "$URL/api/ping" >/dev/null 2>&1; then
+    echo "Pronta su $URL"
+    open "$URL"
+    exit 0
+  fi
+  sleep 1
+done
+errore "La piattaforma non è partita."

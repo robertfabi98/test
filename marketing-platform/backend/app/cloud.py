@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 
 from . import config, library
@@ -20,7 +21,7 @@ def _load() -> dict:
 def public_url(clip_id: str) -> str:
     """Carica la clip (una volta sola) e restituisce il suo link pubblico."""
     if not config.CLOUDINARY_URL:
-        raise RuntimeError("Manca CLOUDINARY_URL nel file .env")
+        raise RuntimeError("Inserisci i dati di Cloudinary nelle Impostazioni")
     import cloudinary
     import cloudinary.uploader
 
@@ -32,7 +33,9 @@ def public_url(clip_id: str) -> str:
         if cached and cached.get("stamp") == stamp:
             return cached["url"]
 
-    cloudinary.config(secure=True)  # legge CLOUDINARY_URL dall'ambiente
+    os.environ["CLOUDINARY_URL"] = config.CLOUDINARY_URL  # impostato dalla pagina Impostazioni
+    cloudinary.reset_config()
+    cloudinary.config(secure=True)
     is_video = src.suffix.lower() in config.VIDEO_EXT
     result = cloudinary.uploader.upload_large(
         str(src),
