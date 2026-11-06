@@ -1,6 +1,6 @@
 """La chat: Claude legge la libreria, trascrive le clip, scrive i testi e prepara il piano.
 
-Claude non pubblica mai da solo: crea proposte che tu confermi con un clic nel pannello "Piano".
+Claude non pubblica mai da solo: crea proposte che tu confermi con un clic nella sezione "Programmazione".
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from datetime import datetime
 
 import anthropic
 
-from . import buffer_api, config, library, plan, transcribe
+from . import analytics, buffer_api, config, library, plan, transcribe
 
 SYSTEM_PROMPT = """Sei il social media manager personale di Robert Fabi e lavori dentro la sua \
 piattaforma di marketing. Robert è un consulente di marketing e personal branding per professionisti \
@@ -21,7 +21,7 @@ Cosa fai:
 - Trovi le clip nella libreria (elenca_clip) e, per capire cosa dice Robert, le trascrivi (trascrivi_clip).
 - Scrivi titoli, descrizioni e hashtag partendo dalla trascrizione, nello stile descritto sotto.
 - Prepari il piano di pubblicazione con proponi_programmazione. Le proposte NON vengono pubblicate: \
-Robert le controlla e le conferma nel pannello "Piano". Diglielo quando ne crei una.
+Robert le controlla e le conferma nella sezione "Programmazione". Diglielo quando ne crei una.
 
 Regole per i testi:
 - Instagram: prima riga = gancio che funziona anche da titolo, poi riga vuota, 2-4 frasi brevi, \
@@ -30,6 +30,10 @@ una call to action, 2-4 hashtag in fondo.
 - YouTube: campo titolo obbligatorio (massimo 90 caratteri, niente clickbait); la descrizione \
 riprende il testo di Instagram.
 - Scrivi solo ciò che la clip dice davvero: non inventare dati, risultati o promesse.
+
+Analytics:
+- Quando Robert chiede cosa funziona, cosa pubblicare o quando, guarda prima i dati con leggi_analytics.
+- Cita numeri veri e il periodo a cui si riferiscono; se i post sono pochi, dillo.
 
 Regole per il piano:
 - Usa sempre date future, nel fuso orario Europe/Rome, in formato ISO (es. 2026-11-10T18:30:00+01:00). \
@@ -86,9 +90,25 @@ TOOLS = [
         "input_schema": {"type": "object", "properties": {}, "required": [], "additionalProperties": False},
     },
     {
+        "name": "leggi_analytics",
+        "description": "Risultati dei post pubblicati su un canale negli ultimi giorni: totali (visualizzazioni, "
+        "copertura, interazioni, engagement rate, tempo di visione) e i post migliori e peggiori. Usalo per "
+        "capire cosa funziona prima di consigliare contenuti, formati o orari.",
+        "strict": True,
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "canale_id": {"type": "string", "description": "id restituito da elenca_canali"},
+                "giorni": {"type": "integer", "description": "Periodo in giorni, es. 30"},
+            },
+            "required": ["canale_id", "giorni"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "name": "proponi_programmazione",
         "description": "Crea una proposta di pubblicazione per una clip su uno o più canali. La proposta "
-        "resta in attesa finché Robert non la conferma nel pannello Piano: non pubblica nulla.",
+        "resta in attesa finché Robert non la conferma nella sezione Programmazione: non pubblica nulla.",
         "strict": True,
         "input_schema": {
             "type": "object",
@@ -157,6 +177,20 @@ def _run_tool(name: str, args: dict) -> tuple[str, str]:
             if i["status"] != plan.STATUS_CANCELLED
         ]
         return json.dumps(items, ensure_ascii=False), "Ho controllato il piano"
+    if name == "leggi_analytics":
+        report = analytics.channel_report(args["canale_id"], max(1, min(int(args["giorni"]), 365)))
+        ranked = sorted(report["posts"], key=lambda p: p["metrics"].get("views", 0), reverse=True)
+        short = lambda p: {"pubblicato": p["sent_at"], "testo": p["text"][:160], "metriche": p["metrics"]}  # noqa: E731
+        out = {
+            "canale": report["channel"]["name"],
+            "servizio": report["channel"]["service"],
+            "giorni": report["days"],
+            "totali": report["totals"],
+            "periodo_precedente": report["previous"],
+            "migliori": [short(p) for p in ranked[:5]],
+            "peggiori": [short(p) for p in ranked[-3:]] if len(ranked) > 5 else [],
+        }
+        return json.dumps(out, ensure_ascii=False), f"Ho letto le analytics di {report['channel']['name']}"
     if name == "proponi_programmazione":
         item = plan.add_proposal(args["clip_id"], args["data_ora"], args["post"], args.get("note", ""))
         return (

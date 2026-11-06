@@ -139,3 +139,65 @@ export function toLocalInput(iso: string): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+// ---------- analytics e programmazione ----------
+
+export type Channel = { id: string; name: string; service: string };
+export type Totals = Record<string, number>;
+
+export type ChannelOverview = { channel: Channel; totals: Totals | null; previous: Totals | null; error: string | null };
+
+export type AnalyticsPost = {
+  id: string;
+  text: string;
+  sent_at: string;
+  link: string | null;
+  thumbnail: string | null;
+  metrics: Record<string, number>;
+};
+
+export type ChannelReport = {
+  channel: Channel;
+  days: number;
+  totals: Totals;
+  previous: Totals | null;
+  posts: AnalyticsPost[];
+  labels: Record<string, string>;
+  updated_at: string;
+};
+
+export type CalendarEntry = {
+  source: "piattaforma" | "buffer";
+  item_id: string | null;
+  status: string;
+  service: string;
+  channel_name: string;
+  title: string;
+  text: string;
+  due_at: string;
+};
+
+export const analyticsApi = {
+  overview: (days: number, refresh = false) =>
+    request<ChannelOverview[]>("GET", `/api/analytics?giorni=${days}${refresh ? "&aggiorna=true" : ""}`),
+  channel: (id: string, days: number, refresh = false) =>
+    request<ChannelReport>("GET", `/api/analytics/${id}?giorni=${days}${refresh ? "&aggiorna=true" : ""}`),
+  calendar: () => request<{ entries: CalendarEntry[]; buffer_error: string | null }>("GET", "/api/calendario"),
+};
+
+export const SERVICE_LABEL: Record<string, string> = {
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  facebook: "Facebook",
+};
+
+export function fmtNumber(n: number | undefined | null, decimals = 0): string {
+  if (n == null || Number.isNaN(n)) return "–";
+  // useGrouping "always": in italiano anche 7465 diventa 7.465
+  return n.toLocaleString("it-IT", {
+    maximumFractionDigits: decimals,
+    minimumFractionDigits: decimals,
+    useGrouping: "always",
+  } as unknown as Intl.NumberFormatOptions);
+}

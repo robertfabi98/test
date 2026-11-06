@@ -2,6 +2,15 @@ import { useEffect, useState } from "react";
 import { api, type Settings } from "../api";
 import FolderPicker from "../components/FolderPicker";
 import SecretField from "../components/SecretField";
+import StylePage from "./StylePage";
+
+const SECTIONS: [string, string][] = [
+  ["collegamenti", "Collegamenti"],
+  ["cartella", "Cartella dei contenuti"],
+  ["pubblicazione", "Pubblicazione"],
+  ["stile", "Il mio stile"],
+  ["avanzate", "Avanzate"],
+];
 
 export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -10,6 +19,7 @@ export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
   const [changingFolder, setChangingFolder] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [section, setSection] = useState("collegamenti");
 
   useEffect(() => {
     api
@@ -37,15 +47,29 @@ export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
 
   if (!settings) return <div className="page">{error || "Carico…"}</div>;
 
+  const connected = [settings.anthropic_api_key, settings.buffer_api_key, settings.cloudinary_url].filter((k) => k.impostato).length;
+
   return (
     <div className="page">
-      <div className="page-inner">
-        <h1>Impostazioni</h1>
+      <div className="page-inner xwide settings-layout">
+        <nav className="settings-nav">
+          <h1>Impostazioni</h1>
+          {SECTIONS.map(([key, label]) => (
+            <button key={key} className={section === key ? "active" : ""} onClick={() => { setSection(key); setMessage(""); setError(""); }}>
+              {label}
+              {key === "collegamenti" && <span className={`pill ${connected === 3 ? "ok" : "warn"}`}>{connected}/3</span>}
+              {key === "pubblicazione" && <span className={`pill ${settings.dry_run ? "warn" : "ok"}`}>{settings.dry_run ? "prova" : "attiva"}</span>}
+            </button>
+          ))}
+        </nav>
+        <div className="settings-body">
         {message && <div className="notice ok">{message}</div>}
         {error && <div className="notice">{error}</div>}
 
+        {section === "cartella" && (
         <section className="card">
           <h2>Cartella dei contenuti</h2>
+          <p className="muted">La cartella dell'hard disk dove salvi i video finiti. Vengono lette anche le sottocartelle.</p>
           <p>
             <strong>{settings.media_dir || "Nessuna cartella scelta"}</strong>
           </p>
@@ -63,7 +87,9 @@ export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
             </button>
           )}
         </section>
+        )}
 
+        {section === "pubblicazione" && (
         <section className="card">
           <h2>Pubblicazione</h2>
           <label className="switch">
@@ -84,9 +110,12 @@ export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
             </span>
           </label>
         </section>
+        )}
 
+        {section === "collegamenti" && (
         <section className="card">
           <h2>Collegamenti</h2>
+          <p className="muted">Le chiavi restano salvate solo su questo Mac.</p>
           <SecretField
             label="Chiave di Claude"
             help="Da"
@@ -125,7 +154,11 @@ export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
             Salva chiavi
           </button>
         </section>
+        )}
 
+        {section === "stile" && <StylePage embedded />}
+
+        {section === "avanzate" && (
         <section className="card">
           <h2>Avanzate</h2>
           <label className="field">
@@ -159,6 +192,8 @@ export default function SettingsPage({ onSaved }: { onSaved: () => void }) {
             Salva
           </button>
         </section>
+        )}
+        </div>
       </div>
     </div>
   );

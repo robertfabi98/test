@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import agent, buffer_api, config, library, plan, transcribe
+from . import agent, analytics, buffer_api, config, library, plan, schedule, transcribe
 
 app = FastAPI(title="Marketing Platform", docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -240,6 +240,30 @@ def plan_cancel(item_id: str):
         return plan.cancel(item_id)
     except Exception as exc:  # noqa: BLE001
         raise _fail(exc) from None
+
+
+# ---------- analytics e programmazione ----------
+
+@app.get("/api/analytics")
+def analytics_overview(giorni: int = 30, aggiorna: bool = False):
+    if not config.BUFFER_API_KEY:
+        raise HTTPException(400, "Collega Buffer nelle Impostazioni per vedere le analytics")
+    return analytics.overview(max(1, min(giorni, 365)), aggiorna)
+
+
+@app.get("/api/analytics/{channel_id}")
+def analytics_channel(channel_id: str, giorni: int = 30, aggiorna: bool = False):
+    if not config.BUFFER_API_KEY:
+        raise HTTPException(400, "Collega Buffer nelle Impostazioni per vedere le analytics")
+    try:
+        return analytics.channel_report(channel_id, max(1, min(giorni, 365)), aggiorna)
+    except Exception as exc:  # noqa: BLE001
+        raise _fail(exc) from None
+
+
+@app.get("/api/calendario")
+def calendar():
+    return schedule.calendar()
 
 
 # ---------- spegnimento ----------

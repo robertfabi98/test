@@ -2,10 +2,12 @@
 
 La tua agenzia di marketing personale: un'app per Mac che si apre con doppio clic, senza terminale e senza codice.
 
-- **Libreria:** legge le clip direttamente dall'hard disk esterno, con anteprime e durata.
-- **Chat con Claude:** trascrive le clip e scrive titoli, descrizioni e hashtag nel tuo stile. Poi prepara il piano di pubblicazione.
-- **Piano:** controlli le proposte, le modifichi e le confermi. La piattaforma carica da sola il file su Cloudinary e lo programma su Buffer per Instagram, TikTok e YouTube.
-- **Il mio stile e Impostazioni:** tutto si configura dall'interfaccia. Le chiavi restano solo sul tuo Mac.
+L'app è divisa in quattro sezioni:
+
+- **Analytics:** risultati per piattaforma (Instagram, TikTok, YouTube) su 7, 30 o 90 giorni. Visualizzazioni, copertura, interazioni, engagement e tempo di visione, con il confronto con il periodo precedente, un grafico per post e la tabella dei post. Il pulsante "Chiedi a Claude cosa funziona" passa i dati alla chat.
+- **Programmazione:** calendario settimanale con i post in coda su Buffer e le proposte della piattaforma. Le proposte si modificano e si confermano da qui.
+- **Creazione:** libreria delle clip lette dall'hard disk, con anteprime e trascrizione, e chat con Claude che scrive titoli, descrizioni e hashtag nel tuo stile e prepara le proposte.
+- **Impostazioni:** collegamenti (Claude, Buffer, Cloudinary), cartella dei contenuti, modalità di pubblicazione, il tuo stile e opzioni avanzate. Le chiavi restano solo sul tuo Mac.
 
 ```
 Hard disk ──► Backend (sul Mac) ◄──► Interfaccia nel browser
@@ -44,11 +46,12 @@ Puoi saltare un passaggio e completarlo dopo da **Impostazioni**.
 
 ## Come si lavora
 
-1. In **Libreria** clicca una clip e premi **Scrivi testi e programma**. Puoi anche scrivere liberamente in chat, per esempio:
+1. In **Creazione** clicca una clip e premi **Scrivi testi e programma**. Puoi anche scrivere liberamente in chat, per esempio:
    - *«Prendi le ultime 3 clip della cartella Reel novembre e distribuiscile la prossima settimana su Instagram e TikTok»*
-   - *«Riscrivi la descrizione del video sul posizionamento, più diretta e senza emoji»*
-2. Claude prepara le proposte nel **Piano**. Puoi cambiare testi, titoli e orari.
+   - *«Guarda le analytics di TikTok dell'ultimo mese e dimmi quali temi funzionano meglio»*
+2. Claude prepara le proposte. Le trovi in **Programmazione**, dove puoi cambiare testi, titoli e orari.
 3. Premi **Conferma e programma**. Claude non pubblica mai da solo: ogni post passa dalla tua conferma.
+4. In **Analytics** controlli come sono andati i post e chiedi a Claude cosa migliorare.
 
 ### Modalità prova
 
@@ -80,6 +83,8 @@ marketing-platform/
 │       ├── transcribe.py    Whisper locale (faster-whisper)
 │       ├── agent.py         chat con Claude e i suoi strumenti
 │       ├── plan.py          proposte, conferma, programmazione
+│       ├── schedule.py      calendario (proposte + coda di Buffer)
+│       ├── analytics.py     analytics per piattaforma dai post di Buffer
 │       ├── cloud.py         caricamento su Cloudinary
 │       └── buffer_api.py    API GraphQL di Buffer
 └── frontend/                React + Vite + TypeScript (dist/ già compilata e inclusa)

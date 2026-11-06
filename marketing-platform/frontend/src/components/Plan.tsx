@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { api, fmtDate, toLocalInput, type PlanItem, type PlanPost } from "../api";
+import { useEffect, useState } from "react";
+import { api, toLocalInput, type PlanItem, type PlanPost } from "../api";
 
 const STATUS: Record<PlanItem["status"], [string, string]> = {
   da_confermare: ["Da confermare", "warn"],
@@ -21,7 +21,7 @@ function editsForApi(edits: Edit[]) {
   return edits.map((e) => ({ ...e, due_at: e.due_at ? new Date(e.due_at).toISOString() : "" }));
 }
 
-function PendingCard({ item, dryRun, onChanged }: { item: PlanItem; dryRun: boolean; onChanged: () => void }) {
+export function PendingCard({ item, dryRun, onChanged }: { item: PlanItem; dryRun: boolean; onChanged: () => void }) {
   const [edits, setEdits] = useState<Edit[]>(() => toEdits(item));
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -119,68 +119,5 @@ function PendingCard({ item, dryRun, onChanged }: { item: PlanItem; dryRun: bool
         )}
       </div>
     </div>
-  );
-}
-
-export default function Plan({ version, dryRun }: { version: number; dryRun: boolean }) {
-  const [items, setItems] = useState<PlanItem[]>([]);
-  const [error, setError] = useState("");
-
-  const load = useCallback(async () => {
-    try {
-      setItems(await api.plan());
-      setError("");
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load, version]);
-
-  const pending = items.filter((i) => ["da_confermare", "parziale", "errore", "simulato"].includes(i.status));
-  const done = items.filter((i) => i.status === "programmato").reverse();
-
-  return (
-    <section className="panel">
-      <div className="panel-head">
-        <h2>Piano</h2>
-        <button className="ghost icon" onClick={load} title="Aggiorna">
-          ↻
-        </button>
-      </div>
-      <div className="panel-body plan">
-        {error && <div className="notice">{error}</div>}
-        <h3>Da confermare</h3>
-        {pending.length ? (
-          pending.map((i) => <PendingCard key={i.id} item={i} dryRun={dryRun} onChanged={load} />)
-        ) : (
-          <div className="empty">Nessuna proposta in attesa. Chiedi a Claude di prepararne una.</div>
-        )}
-        <h3>Programmati</h3>
-        {done.length ? (
-          done.map((item) => (
-            <div className="plan-card" key={item.id}>
-              <div className="plan-head">
-                <div className="plan-title">{item.clip_name}</div>
-                <span className="pill ok">Programmato</span>
-              </div>
-              {item.posts.map((p) => (
-                <div className="post" key={p.channel_id}>
-                  <span className="service">
-                    {p.service} · {fmtDate(p.due_at)}
-                  </span>
-                  {p.title && <strong>{p.title}</strong>}
-                  <div className="post-text">{p.text}</div>
-                </div>
-              ))}
-            </div>
-          ))
-        ) : (
-          <div className="empty">Ancora niente.</div>
-        )}
-      </div>
-    </section>
   );
 }

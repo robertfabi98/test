@@ -1,18 +1,68 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, type Status } from "./api";
 import Setup from "./pages/Setup";
-import Workspace from "./pages/Workspace";
+import AnalyticsPage from "./pages/AnalyticsPage";
+import SchedulePage from "./pages/SchedulePage";
+import CreatePage from "./pages/CreatePage";
 import SettingsPage from "./pages/SettingsPage";
-import StylePage from "./pages/StylePage";
 
-type Page = "lavoro" | "stile" | "impostazioni";
+type Section = "analytics" | "programmazione" | "creazione" | "impostazioni";
+
+const NAV: { key: Section; label: string; hint: string; icon: JSX.Element }[] = [
+  {
+    key: "analytics",
+    label: "Analytics",
+    hint: "Risultati per piattaforma",
+    icon: (
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M3 17V9M8 17V4M13 17v-6M18 17V7" />
+      </svg>
+    ),
+  },
+  {
+    key: "programmazione",
+    label: "Programmazione",
+    hint: "Calendario e gestione",
+    icon: (
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <rect x="2.5" y="4" width="15" height="13" rx="2" />
+        <path d="M2.5 8h15M6.5 2v4M13.5 2v4" />
+      </svg>
+    ),
+  },
+  {
+    key: "creazione",
+    label: "Creazione",
+    hint: "Libreria e chat con Claude",
+    icon: (
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <path d="M10 2.5l1.8 4.7 4.7 1.8-4.7 1.8L10 15.5l-1.8-4.7L3.5 9l4.7-1.8z" />
+        <path d="M16 14l.7 1.8 1.8.7-1.8.7L16 19l-.7-1.8-1.8-.7 1.8-.7z" />
+      </svg>
+    ),
+  },
+  {
+    key: "impostazioni",
+    label: "Impostazioni",
+    hint: "Collegamenti, cartella, stile",
+    icon: (
+      <svg viewBox="0 0 20 20" aria-hidden="true">
+        <circle cx="10" cy="10" r="2.8" />
+        <path d="M10 1.8v2.4M10 15.8v2.4M1.8 10h2.4M15.8 10h2.4M4.2 4.2l1.7 1.7M14.1 14.1l1.7 1.7M4.2 15.8l1.7-1.7M14.1 5.9l1.7-1.7" />
+      </svg>
+    ),
+  },
+];
 
 export default function App() {
   const [status, setStatus] = useState<Status | null>(null);
   const [error, setError] = useState("");
-  const [page, setPage] = useState<Page>("lavoro");
+  const [section, setSection] = useState<Section>(
+    () => (localStorage.getItem("mp-section") as Section | null) ?? "creazione",
+  );
   const [setupDone, setSetupDone] = useState(() => localStorage.getItem("mp-setup") === "ok");
   const [closed, setClosed] = useState(false);
+  const [draft, setDraft] = useState("");
 
   const refresh = useCallback(async () => {
     try {
@@ -26,6 +76,15 @@ export default function App() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  const go = (s: Section) => {
+    setSection(s);
+    try {
+      localStorage.setItem("mp-section", s);
+    } catch {
+      /* non importante */
+    }
+  };
 
   if (closed) {
     return (
@@ -67,53 +126,82 @@ export default function App() {
     }
   };
 
-  const pills: [string, boolean][] = [
+  const links: [string, boolean][] = [
     ["Hard disk", status.media_dir_ok],
     ["Claude", status.claude],
     ["Buffer", status.buffer],
     ["Cloudinary", status.cloudinary],
-    ["Trascrizione", status.whisper],
   ];
+  const missing = links.filter(([, ok]) => !ok).map(([l]) => l);
 
   return (
-    <div className="app">
-      <header className="topbar">
-        <div className="brand">Marketing Platform</div>
-        <nav className="tabs">
-          {(
-            [
-              ["lavoro", "Lavoro"],
-              ["stile", "Il mio stile"],
-              ["impostazioni", "Impostazioni"],
-            ] as [Page, string][]
-          ).map(([key, label]) => (
-            <button key={key} className={`tab ${page === key ? "active" : ""}`} onClick={() => setPage(key)}>
-              {label}
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true" />
+          Marketing Platform
+        </div>
+        <nav className="nav">
+          {NAV.map((n) => (
+            <button key={n.key} className={`nav-item ${section === n.key ? "active" : ""}`} onClick={() => go(n.key)}>
+              {n.icon}
+              <span>
+                <span className="nav-label">{n.label}</span>
+                <span className="nav-hint">{n.hint}</span>
+              </span>
             </button>
           ))}
         </nav>
-        <div className="status">
-          {pills.map(([label, ok]) => (
-            <span key={label} className={`pill ${ok ? "ok" : "no"}`} title={ok ? "Collegato" : "Da configurare"}>
-              {label}
-            </span>
-          ))}
+        <div className="sidebar-foot">
           {status.dry_run ? (
-            <span className="pill warn" title="Le conferme non inviano niente a Buffer">
-              Modalità prova
-            </span>
+            <button className="mode warn" onClick={() => go("impostazioni")} title="Le conferme non inviano niente a Buffer">
+              ● Modalità prova
+            </button>
           ) : (
-            <span className="pill ok">Pubblicazione attiva</span>
+            <span className="mode ok">● Pubblicazione attiva</span>
           )}
-          <button className="ghost small" onClick={close} title="Chiudi la piattaforma">
-            Chiudi
+          <div className="links">
+            {links.map(([label, ok]) => (
+              <span key={label} className="link-status">
+                <span className={`dot ${ok ? "ok" : "no"}`} />
+                {label}
+              </span>
+            ))}
+          </div>
+          {missing.length > 0 && (
+            <button className="link small" onClick={() => go("impostazioni")}>
+              Completa i collegamenti
+            </button>
+          )}
+          <button className="ghost small" onClick={close}>
+            Chiudi l'app
           </button>
         </div>
-      </header>
+      </aside>
 
-      {page === "lavoro" && <Workspace status={status} goToSettings={() => setPage("impostazioni")} />}
-      {page === "stile" && <StylePage />}
-      {page === "impostazioni" && <SettingsPage onSaved={refresh} />}
+      <div className="content">
+        {section === "analytics" && (
+          <AnalyticsPage
+            buffer={status.buffer}
+            goToSettings={() => go("impostazioni")}
+            askClaude={(prompt) => {
+              setDraft(prompt);
+              go("creazione");
+            }}
+          />
+        )}
+        {section === "programmazione" && <SchedulePage dryRun={status.dry_run} goToCreate={() => go("creazione")} />}
+        {section === "creazione" && (
+          <CreatePage
+            status={status}
+            draft={draft}
+            setDraft={setDraft}
+            goToSettings={() => go("impostazioni")}
+            goToSchedule={() => go("programmazione")}
+          />
+        )}
+        {section === "impostazioni" && <SettingsPage onSaved={refresh} />}
+      </div>
     </div>
   );
 }

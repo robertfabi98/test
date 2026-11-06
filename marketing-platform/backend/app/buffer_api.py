@@ -9,7 +9,7 @@ import requests
 from . import config
 
 # Campi che nello schema GraphQL di Buffer sono enum (vanno scritti senza virgolette)
-_ENUM_KEYS = {"schedulingType", "mode", "type"}
+_ENUM_KEYS = {"schedulingType", "mode", "type", "field", "direction", "status"}
 
 
 def _literal(value, key: str | None = None) -> str:
@@ -18,7 +18,7 @@ def _literal(value, key: str | None = None) -> str:
         inner = ", ".join(f"{k}: {_literal(v, k)}" for k, v in value.items() if v is not None)
         return "{ " + inner + " }"
     if isinstance(value, list):
-        return "[" + ", ".join(_literal(v) for v in value) + "]"
+        return "[" + ", ".join(_literal(v, key) for v in value) + "]"
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, (int, float)):
@@ -126,3 +126,58 @@ def create_post(post_input: dict) -> dict:
     if "post" in result:
         return result["post"]
     raise BufferError(result.get("message", "Buffer non ha creato il post"))
+
+
+# ---------- lettura dei post (analytics e calendario) ----------
+
+# Dal più completo al più semplice: se Buffer non riconosce un campo, si riprova con meno campi.
+_POST_FIELDS = [
+    "id text status channelId channelService dueAt sentAt externalLink "
+    "assets { thumbnail } metrics { type name value unit }",
+    "id text status channelId channelService dueAt sentAt externalLink metrics { type name value unit }",
+    "id text status channelId dueAt sentAt",
+]
+
+
+def list_posts(
+    *, statuses: list[str], channel_ids: list[str] | None = None, limit: int = 100,
+    with_metrics: bool = False, newest_first: bool = True,
+) -> list[dict]:
+    """Post dell'organizzazione con lo stato indicato (sent, scheduled, draft, error...)."""
+    filt: dict = {"status": statuses}
+    if channel_ids:
+        filt["channelIds"] = channel_ids
+    fields_options = _POST_FIELDS if with_metrics else [
+        f.replace(" metrics { type name value unit }", "") for f in _POST_FIELDS[1:]
+    ]
+    sort = [{"field": "dueAt", "direction": "desc" if newest_first else "asc"}]
+    attempts = [(f, True) for f in fields_options] + [(fields_options[-1], False)]
+
+    last_error: Exception | None = None
+    for fields, with_sort in attempts:
+        posts: list[dict] = []
+        cursor = None
+        try:
+            while len(posts) < limit:
+                args: dict = {"organizationId": config.BUFFER_ORG_ID, "filter": filt}
+                if with_sort:
+                    args["sort"] = sort
+                after = f", after: {json.dumps(cursor)}" if cursor else ""
+                query = (
+                    f"query GetPosts {{ posts(first: {min(50, limit - len(posts))}{after}, "
+                    f"input: {_literal(args)}) {{ edges {{ node {{ {fields} }} }} "
+                    f"pageInfo {{ hasNextPage endCursor }} }} }}"
+                )
+                data = _gql(query)["posts"]
+                posts += [e["node"] for e in data.get("edges", [])]
+                page = data.get("pageInfo") or {}
+                if not page.get("hasNextPage") or not page.get("endCursor"):
+                    break
+                cursor = page["endCursor"]
+            return posts
+        except BufferError as exc:
+            last_error = exc
+            msg = str(exc).lower()
+            if not any(w in msg for w in ("field", "cannot query", "sort", "argument", "unknown")):
+                raise
+    raise last_error or BufferError("Impossibile leggere i post da Buffer")

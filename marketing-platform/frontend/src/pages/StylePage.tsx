@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 
-export default function StylePage() {
+export default function StylePage({ embedded = false }: { embedded?: boolean }) {
   const [text, setText] = useState("");
   const [saved, setSaved] = useState("");
   const [message, setMessage] = useState("");
@@ -30,10 +30,9 @@ export default function StylePage() {
     }
   };
 
-  return (
-    <div className="page">
-      <div className="page-inner wide">
-        <h1>Il mio stile</h1>
+  const body = (
+    <>
+        {embedded ? <h2>Il mio stile</h2> : <h1>Il mio stile</h1>}
         <p className="muted">
           Claude legge questo testo ogni volta che scrive per te: tono, temi, hashtag, call to action ed esempi di post. Più
           è preciso, più i testi ti somigliano.
@@ -52,7 +51,12 @@ export default function StylePage() {
             Ripristina iniziale
           </button>
         </div>
-      </div>
+    </>
+  );
+  if (embedded) return <section className="card">{body}</section>;
+  return (
+    <div className="page">
+      <div className="page-inner wide">{body}</div>
     </div>
   );
 }

@@ -98,7 +98,7 @@ export default function Chat({
           <div className="msg assistant intro">
             Ciao Robert. Scegli una clip dalla libreria oppure scrivimi cosa vuoi fare, per esempio:{" "}
             <em>«Prendi le ultime 3 clip della cartella Reel novembre e distribuiscile la prossima settimana su Instagram e TikTok»</em>.
-            Preparo le proposte, tu le confermi nel Piano.
+            Preparo le proposte, tu le controlli e le confermi in Programmazione.
           </div>
         )}
         {messages.map((m, i) => (
